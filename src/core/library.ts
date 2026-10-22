@@ -48,7 +48,7 @@ export const DEFAULT_SETTINGS: Settings = {
   socketGap: 1 / 16,
   stickLength: 40 * 12,
   cutWaste: 1 / 4,
-  brand: 'gf',
+  brand: 'integrifuse',
 };
 
 // ASME B16.9 long-radius butt-weld fittings, centre-to-end in inches. (Standard values; always
@@ -75,9 +75,13 @@ const TEE: Record<string, number> = {
 //    equal tees overall "z" (run = z ÷ 2) and branch "z2". These are the sizes the Black & Veatch
 //    sheets were drawn with: sheets -6 (6"), -11 (4"), -13 and -2 (6") add up to their bills of
 //    materials to the 1/16" with them.
-//  - Integrifuse (Integrity Fusion Products) butt fusion catalog: 90° / 45° "A" (centre to end:
-//    the tee's half-run equals the 90's A, and A + OD/2 = the 90's outside dimension E), tees "B",
-//    reducers and caps "A" (overall length), flange adapters "D" (length).
+//  - Integrifuse (Integrity Fusion Products), product dimension sheets Rev. 072026-A (the fittings
+//    on site: item 100013 = 6" 45, item 100906 = 6" wye): 90° / 45° "A" = centre to end (matches
+//    the tee's centre-to-branch "B" and the crew's 90 ≈ 9", 45 ≈ 6"); tees "A" overall run, "B"
+//    centre to branch end; reducers and caps "A" overall length. Lateral wyes: "A" overall run,
+//    "B" centre to outlet end, "C" centre to branch end, so centre to heel = A − B (the sheets
+//    don't label the letters: this is the reading that fits the drawing; measure one to be sure).
+//    Flange adapters "D" (length) from the earlier Integrifuse catalog.
 export type Brand = 'gf' | 'integrifuse';
 export const BRANDS: Record<Brand, string> = {gf: 'GF Central Plastics', integrifuse: 'Integrifuse'};
 
@@ -88,6 +92,7 @@ interface MakerTable {
   reducer: Record<string, number>; // "6x4" → end to end
   cap: Record<string, number>;
   flange: Record<string, number>; // flange adapter length
+  lateral: Record<string, [number, number, number]>; // heel, outlet, branch (centre to end)
 }
 const MAKERS: Record<Brand, MakerTable> = {
   gf: {
@@ -97,14 +102,16 @@ const MAKERS: Record<Brand, MakerTable> = {
     reducer: {},
     cap: {},
     flange: {},
+    lateral: {},
   },
   integrifuse: {
-    e90: {'2': 4.25, '3': 5.91, '4': 6.89, '6': 9.06, '8': 11.81},
-    e45: {'2': 3.23, '3': 4.72, '4': 5.31, '6': 6.89, '8': 8.46},
-    tee: {'2': [4.33, 4.33], '3': [5.91, 5.91], '4': [6.89, 6.89], '6': [9.06, 9.06], '8': [11.81, 11.81]},
-    reducer: {'3x2': 7.87, '4x2': 9.06, '4x3': 9.06, '6x3': 11.03, '6x4': 11.42, '8x6': 12.8},
-    cap: {'2': 3.23, '3': 4.72, '4': 5.31, '6': 6.89, '8': 8.66},
+    e90: {'2': 4.72, '3': 6.5, '4': 6.94, '6': 8.8, '8': 11.25},
+    e45: {'2': 3.4, '3': 4.46, '4': 5.14, '6': 6.46, '8': 7.18},
+    tee: {'2': [4.55, 4.75], '3': [5.92, 6.0], '4': [6.925, 7.0], '6': [9.055, 9.06], '8': [11.7, 11.6]},
+    reducer: {'3x2': 7.72, '4x2': 7.76, '4x3': 9.0, '6x3': 11.42, '6x4': 11.42, '8x6': 12.8},
+    cap: {'2': 3.3, '3': 4.58, '4': 5.2, '6': 7.08, '8': 8.68},
     flange: {'2': 6.1, '3': 6.1, '4': 6.1, '6': 8.07, '8': 10.67},
+    lateral: {'2': [18.46, 5.28, 13.1], '3': [17.92, 6.0, 13.46], '4': [22.22, 5.74, 20.5], '6': [27.56, 6.18, 25.54], '8': [30.0, 6.5, 27.7]},
   },
 };
 const sixteenth = (x: number) => Math.round(x * 16) / 16;
@@ -128,6 +135,10 @@ function makerFitting(brand: Brand, type: FittingType, size: number, material: M
   if (type === 'tee' && t.tee[k]) return {id, type, size, material, takeout: sixteenth(t.tee[k][0]), branch: sixteenth(t.tee[k][1]), note};
   if (type === 'reducer' && size2 && t.reducer[`${k}x${size2}`]) return {id, type, size, size2, material, takeout: null, laying: sixteenth(t.reducer[`${k}x${size2}`]), note};
   if (type === 'cap' && t.cap[k]) return {id, type, size, material, takeout: sixteenth(t.cap[k]), laying: sixteenth(t.cap[k]), note};
+  if (type === 'lateral' && t.lateral[k]) {
+    const [heel, outlet, branch] = t.lateral[k];
+    return {id, type, size, material, takeout: sixteenth(heel), outlet: sixteenth(outlet), branch: sixteenth(branch), note: `${note} (centre to heel / outlet / branch)`};
+  }
   if (type === 'flange' && t.flange[k]) return {id, type, size, material, takeout: sixteenth(t.flange[k]), laying: sixteenth(t.flange[k]), note: `${BRANDS[brand]} flange adapter`};
   return null;
 }

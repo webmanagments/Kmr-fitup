@@ -35,8 +35,10 @@ Rounded to the nearest 1/16". Take-outs come from the drawing first, then your o
 - **HDPE, by maker** (Setup → "Who made the HDPE fittings?"; sizes differ by up to ~2"):
   - *GF Central Plastics* (IPS & DIPS Industrial catalog): 2"–12" 90s, 45s and equal tees.
     6": 90 = 8 5/8", 45 = 8 1/2", tee = 9". 4": 90 = 6 3/8", 45 = 6 1/4".
-  - *Integrifuse / Integrity Fusion* (butt fusion catalog): 2"–8" 90s, 45s, tees, reducers, caps
-    and flange adapters. 6": 90 = 9 1/16", 45 = 6 7/8", tee = 9 1/16".
+  - *Integrifuse / Integrity Fusion* (the default: the fittings on site), product dimension sheets
+    Rev. 072026-A: 2"–8" 90s, 45s, tees, lateral wyes, reducers and caps (+ flange adapters).
+    6": 90 = 8 13/16", 45 = 6 7/16" (item 100013), tee = 9 1/16", wye (item 100906) = 2'-3 9/16"
+    centre to heel, 6 3/16" to outlet, 2'-1 9/16" to branch.
   - If the chosen maker has no figure for a fitting, the other maker's is used and flagged.
   - The app also says which maker's sizes make each sheet add up to its own parts list (the B&V
     sheets add up with GF to the 1/16").

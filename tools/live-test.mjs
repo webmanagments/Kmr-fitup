@@ -78,7 +78,7 @@ try {
   await ph.waitForFunction(() => document.querySelectorAll('.results .cut').length > 0 && !document.querySelector('.improve') && !document.querySelector('.card.reading'), null, {timeout: 15000});
   check('Second read sends both photos with what was missing', calls.length === 2 && calls[1].messages[0].content.filter(c => c.type === 'image').length === 2 && JSON.stringify(calls[1]).includes('bill of materials quantities'));
   const cuts = await ph.locator('.results .cut').allTextContents();
-  check('Cut list shows', cuts.includes(`4'-10 9/16"`), cuts.join(', '));
+  check('Cut list shows (Integrifuse sizes)', cuts.includes(`4'-10 3/8"`), cuts.join(', '));
   shots && (await ph.screenshot({path: `${shots}/live-4.png`}));
 
   // Several photos of one sheet, picked from the gallery: read as one, double-checked.

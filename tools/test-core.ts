@@ -8,6 +8,8 @@ import {makerFits, makerLine} from '../src/core/makers.ts';
 import {angleFor, cutFromTravel, elbowTakeout, equalSpread, miter, offset, rollingOffset} from '../src/core/fitmath.ts';
 
 let n = 0;
+// The B&V sheets were drawn with GF Central Plastics sizes; the BOM checks use those.
+const GF = {...DEFAULT_SETTINGS, brand: 'gf' as const};
 const t = (name: string, fn: () => void) => {
   fn();
   n++;
@@ -76,7 +78,7 @@ t('steel falls back to ASME B16.9 take-outs', () => {
 });
 
 t('sheet -3: lateral wye, pipe 19\'-9 5/16" matches the print, BOM flagged', () => {
-  const r = solve(SHEET_3);
+  const r = solve(SHEET_3, GF);
   const pipe = r.pieces.filter(p => p.status === 'ok');
   assert.equal(pipe.length, 1);
   assert.equal(formatLength(pipe[0].cut), `19'-9 5/16"`);
@@ -89,7 +91,7 @@ t('sheet -3: lateral wye, pipe 19\'-9 5/16" matches the print, BOM flagged', () 
   assert.match(r.welds.find(x => x.number === '1146')!.joins, /wye.*↔ sheet ISO-6/);
 });
 t('sheet -6: catalog molded take-outs add up to its BOM to the 1/16"', () => {
-  const r = solve(SHEET_6);
+  const r = solve(SHEET_6, GF);
   assert.ok(r.ready, JSON.stringify(r.checks));
   assert.equal(formatLength(r.pieces[0].cc), `5'-7 3/16"`);
   const e2 = r.points.find(p => p.id === 'E2')!.pos!;
@@ -107,7 +109,7 @@ t('sheet -6: catalog molded take-outs add up to its BOM to the 1/16"', () => {
     {id: 'a', type: 'elbow90', size: 6, material: 'hdpe', takeout: 36},
     {id: 'b', type: 'elbow45', size: 6, material: 'hdpe', takeout: 30},
   ];
-  const f = solve(SHEET_6, DEFAULT_SETTINGS, field);
+  const f = solve(SHEET_6, GF, field);
   assert.ok(!f.ready);
   assert.equal(f.pieces[2].status, 'negative');
   assert.equal(f.pieces[0].deductions[0].source, 'library');
@@ -115,7 +117,7 @@ t('sheet -6: catalog molded take-outs add up to its BOM to the 1/16"', () => {
 t('one unknown take-out: the BOM total suggests it', () => {
   const s = structuredClone(SHEET_6);
   s.fittings[0].type = 'elbow22'; // no catalog value
-  const h = solve(s);
+  const h = solve(s, GF);
   assert.ok(h.checks.find(c => c.level === 'info' && /If the 6" 22½° elbow is 8 5\/8" centre to end/.test(c.text)), JSON.stringify(h.checks));
   assert.equal(h.missing.length, 1);
   assert.equal(h.missing[0].suggest, 8.625);
@@ -135,7 +137,7 @@ t('HDPE catalog covers 2"-12" 90s, 45s and tees', () => {
   assert.equal(lookup([{id: 'x', type: 'elbow90', size: 6, material: 'hdpe', takeout: 9}], 'elbow90', 6, 'hdpe')!.source, 'library');
 });
 t('sheet -13: cleanout riser, rolled 45s and lateral add up to the BOM (25\'-3 5/16")', () => {
-  const r = solve(SHEET_13);
+  const r = solve(SHEET_13, GF);
   assert.ok(r.ready, JSON.stringify(r.checks));
   const cut = r.pieces.filter(p => p.status === 'ok').map(p => formatLength(p.cut));
   assert.deepEqual(cut, [`2'-0"`, `23'-3 5/16"`]);
@@ -152,7 +154,7 @@ t('sheet -13: cleanout riser, rolled 45s and lateral add up to the BOM (25\'-3 5
   assert.ok(Math.abs(W.x / 12 - 740.637) < 0.02, String(W.x / 12)); // within 1/4" of the branch-end geometry
 });
 t('sheet -11 (4"): 90, 45 and a 6x4 reducer add up to the BOM (24\'-2")', () => {
-  const r = solve(SHEET_11);
+  const r = solve(SHEET_11, GF);
   assert.ok(r.ready, JSON.stringify(r.checks));
   assert.deepEqual(r.pieces.map(p => formatLength(p.cut)), [`5'-6 1/2"`, `18'-7 1/2"`, '—']);
   assert.deepEqual(r.pieces.map(p => formatLength(p.takeout)), [`6 3/8"`, `1'-0 5/8"`, `1'-3 1/2"`]);
@@ -161,7 +163,7 @@ t('sheet -11 (4"): 90, 45 and a 6x4 reducer add up to the BOM (24\'-2")', () => 
   assert.equal(r.size, 4);
 });
 t('sheet -2: geometry from elevations and the wye branch', () => {
-  const r = solve(SHEET_2);
+  const r = solve(SHEET_2, GF);
   const e2 = r.points.find(p => p.id === 'E2')!.pos!;
   assert.ok(Math.abs(e2.x / 12 - 1039.45) < 0.01);
   assert.equal(formatLength(r.pieces[1].cc), `1'-5"`);
@@ -219,27 +221,32 @@ t('fitter math: offsets, rolling offsets, elbow take-outs, miters', () => {
 });
 t('fitting makers: Integrifuse sizes, fallbacks and which maker a sheet was drawn with', () => {
   const lk = (type: any, size: number, s2?: number) => lookup([], type, size, 'hdpe', s2, 'integrifuse')?.entry;
-  assert.equal(lk('elbow90', 6)!.takeout, 9.0625);
-  assert.equal(lk('elbow45', 6)!.takeout, 6.875);
-  assert.equal(lk('elbow90', 2)!.takeout, 4.25);
-  assert.equal(lk('tee', 4)!.branch, 6.875);
-  assert.equal(lk('reducer', 4, 2)!.laying, 9.0625);
-  assert.equal(lk('cap', 6)!.takeout, 6.875);
-  assert.equal(lk('lateral', 6)!.note, 'From the B&V HDPE isometrics (matches their BOMs)'); // no Integrifuse figure: the drawings'
+  assert.equal(DEFAULT_SETTINGS.brand, 'integrifuse'); // the fittings on site
+  assert.equal(lk('elbow90', 6)!.takeout, 8.8125); // 8.80
+  assert.equal(lk('elbow45', 6)!.takeout, 6.4375); // 6.46 (item 100013)
+  assert.equal(lk('elbow90', 2)!.takeout, 4.75); // 4.72
+  assert.equal(lk('elbow45', 4)!.takeout, 5.125); // 5.14
+  assert.equal(lk('tee', 4)!.branch, 7);
+  assert.equal(lk('reducer', 6, 4)!.laying, 11.4375); // 11.42
+  assert.equal(lk('cap', 6)!.takeout, 7.0625); // 7.08
+  const wye = lk('lateral', 6)!; // item 100906: A 33.74, B 6.18, C 25.54
+  assert.deepEqual([wye.takeout, wye.outlet, wye.branch], [27.5625, 6.1875, 25.5625]);
   assert.equal(lk('elbow90', 10)!.other, 'GF Central Plastics'); // Integrifuse doesn't list 10": GF, flagged
-  // Sheet -6 under Integrifuse: P2 = 22'-11 1/4" − 9 1/16" − 6 7/8"
-  const r = solve(SHEET_6, {...DEFAULT_SETTINGS, brand: 'integrifuse'});
-  assert.equal(formatLength(r.pieces[1].cut), `21'-7 5/16"`);
+  assert.equal(lk('cleanout', 6)!.note, 'From the B&V HDPE isometrics (matches their BOMs)'); // no maker figure: the drawings'
+  // Sheet -6 with Integrifuse fittings: P1 = 5'-7 3/16" − 8 13/16", P2 = 22'-11 1/4" − 8 13/16" − 6 7/16",
+  // and the shorter 45 leaves a 2 1/16" piece before the -3 wye.
+  const r = solve(SHEET_6);
+  assert.deepEqual(r.pieces.map(p => formatLength(p.cut)), [`4'-10 3/8"`, `21'-8"`, '2 1/16"']);
   // A missing size from the chosen maker uses the other's and says so.
   const s = structuredClone(SHEET_6);
   s.fittings[0].size = '10"';
   assert.ok(solve(s, {...DEFAULT_SETTINGS, brand: 'integrifuse'}).checks.some(c => /Using the GF Central Plastics size for the 10" 90° elbow/.test(c.text)));
   // Which maker the sheets add up with
   const fmt = formatLength;
-  for (const sh of [SHEET_6, SHEET_11, SHEET_13]) assert.match(makerLine(sh, DEFAULT_SETTINGS, fmt)!, /adds up with GF Central Plastics/);
-  const fits = makerFits(SHEET_6, DEFAULT_SETTINGS);
+  for (const sh of [SHEET_6, SHEET_11, SHEET_13]) assert.match(makerLine(sh, GF, fmt)!, /adds up with GF Central Plastics/);
+  const fits = makerFits(SHEET_6, GF);
   assert.equal(fits.find(f => f.brand === 'gf')!.off, 0);
-  // Integrifuse's shorter 45 would leave a 1 5/8" pipe between the 45 and the wye too: 2 3/8" over.
-  assert.equal(fits.find(f => f.brand === 'integrifuse')!.off, 2.375);
+  // Integrifuse's longer 90 takes 3/8" more; its shorter 45 leaves 2 1/16" more on P2 and a new 2 1/16" piece.
+  assert.equal(fits.find(f => f.brand === 'integrifuse')!.off, 3.75);
 });
 console.log(`\n${n} passed`);

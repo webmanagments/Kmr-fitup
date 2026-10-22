@@ -88,10 +88,10 @@ try {
   check('Opens the sheet on the 3D view', (await focused()) === 'model');
   await shot('03-model');
   await noClip('model');
-  check('ISO-6 is ready with catalog take-outs', (await g.textContent('.info')).includes(`2 pipes · 26'-4 11/16"`), await g.textContent('.info'));
+  check('ISO-6 is ready with Integrifuse sizes (the fittings on site)', (await g.textContent('.info')).includes(`3 pipes · 26'-8 7/16"`), await g.textContent('.info'));
   await key('ArrowRight', 1, 500);
   const info1 = await g.textContent('.info');
-  check('Right selects the first part', /P1/.test(info1) && info1.includes(`CUT 4'-10 9/16"`), info1.slice(0, 80));
+  check('Right selects the first part', /P1/.test(info1) && info1.includes(`CUT 4'-10 3/8"`), info1.slice(0, 80));
   await shot('04-part');
   await key('ArrowDown', 1, 600);
   check('Down changes the view', (await g.textContent('.model-view')) === 'Spin');
@@ -122,7 +122,7 @@ try {
   check('Pinch saves and closes', (await g.locator('.stepper').count()) === 0);
   check('Focus returns to the list', await g.evaluate(() => !!document.activeElement?.closest('.list-tab')));
   const checks = await g.locator('.check').allTextContents();
-  check('No errors; BOM matches', !checks.some(c => /Need the|not set/.test(c)) && checks.some(c => /matches the BOM/.test(c)), checks.join(' | ').slice(0, 200));
+  check('No errors; says the sheet was drawn with GF sizes', !checks.some(c => /Need the|not set/.test(c)) && checks.some(c => /adds up with GF Central Plastics/.test(c)) && checks.some(c => /worked out with GF Central Plastics fittings/.test(c)), checks.join(' | ').slice(0, 300));
   await shot('07-checks-done');
   await key('ArrowUp', 4);
   check('Up from the first row lands on Checks tab', (await focused()) === 'tab-checks');
@@ -132,7 +132,7 @@ try {
   check('Cuts tab', (await focused()) === 'tab-cuts');
   await key('ArrowDown');
   const cuts = await g.locator('.row-big').allTextContents();
-  check('ISO-6 cuts with 1/8" per fused end: 4\'-10 11/16" and 21\'-6 3/8"', cuts[0] === `4'-10 11/16"` && cuts[1] === `21'-6 3/8"`, cuts.join(', '));
+  check('ISO-6 cuts with 1/8" per fused end: 4\'-10 1/2", 21\'-8 1/4", 2 3/16"', cuts.join(',') === `4'-10 1/2",21'-8 1/4",2 3/16"`, cuts.join(', '));
   await key('Enter', 1, 300);
   check('Pinch marks a cut', (await g.locator('.row-btn.done').count()) === 1);
   await shot('08-cuts');
@@ -158,7 +158,7 @@ try {
   await key('ArrowLeft', 4);
   await key('ArrowDown', 1, 400);
   const info2 = await g.textContent('.info');
-  check('Selecting P1 shows its cut', info2.includes(`CUT 4'-10 11/16"`) && info2.includes('✓'), info2.slice(0, 80));
+  check('Selecting P1 shows its cut', info2.includes(`CUT 4'-10 1/2"`) && info2.includes('✓'), info2.slice(0, 80));
   await key('Enter', 1, 400);
   check('Pinch opens the part details', (await g.locator('.modal').count()) === 1 && (await g.textContent('.modal')).includes('Centre to centre'));
   await shot('11-detail');
@@ -169,7 +169,7 @@ try {
   check('Back again goes home', (await g.locator('.home').count()) === 1);
   check('Home returns to the card used', (await focused()).startsWith('job-demo2'));
   const sub = await g.evaluate(() => document.activeElement?.textContent ?? '');
-  check('Card shows progress', sub.includes('1/2 cut') && sub.includes('1/3 joints'), sub);
+  check('Card shows progress', sub.includes('1/3 cut') && sub.includes('1/3 joints'), sub);
   await shot('12-home-progress');
   check('Overflowing text', (await overflow()).length === 0, (await overflow()).join(', '));
 

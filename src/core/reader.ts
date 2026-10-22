@@ -1,7 +1,8 @@
 // Reads an isometric photo with Claude (vision), straight from the phone with the user's own key.
 // The model fills in a fixed structure (a forced tool call), copying numbers exactly as printed.
 // The app does every calculation itself; the model only reads.
-import type {Settings, TakeoutEntry} from './library.ts';
+import {DEFAULT_SETTINGS, type Settings, type TakeoutEntry} from './library.ts';
+import {makerFits} from './makers.ts';
 import {SHEET_13} from './samples.ts';
 import {solve} from './solve.ts';
 import type {Fitting, Joining, Leg, Point, Sheet, Weld, BomItem, FittingType} from './types.ts';
@@ -270,9 +271,13 @@ export async function readSheet(apiKey: string, images: ImageIn[], model = DEFAU
 export function readingProblems(sheet: Sheet, settings?: Settings, library: TakeoutEntry[] = []): string[] {
   const sol = solve(sheet, settings, library);
   const out: string[] = [];
+  // The parts list may have been worked out with another maker's fittings: if any maker's sizes
+  // make it add up, the reading is fine.
+  const someMakerFits = makerFits(sheet, settings ?? DEFAULT_SETTINGS).some(f => f.off !== null && Math.abs(f.off) <= 1 / 8);
   for (const c of sol.checks) {
     if (c.level !== 'error' && c.level !== 'warn') continue;
-    if (/^Need the |Fusion allowance|longer than a .* stick|^Couldn't read/.test(c.text)) continue;
+    if (/^Need the |Fusion allowance|longer than a .* stick|^Couldn't read|^Using the /.test(c.text)) continue;
+    if (someMakerFits && /^Pipe total .* vs BOM/.test(c.text)) continue;
     out.push(c.text);
   }
   for (const p of sol.pieces)

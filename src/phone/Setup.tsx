@@ -73,7 +73,7 @@ export function ShopCard() {
       <h3>Shop numbers</h3>
       <label>
         Who made the HDPE fittings? (it's stamped on them)
-        <select value={s.brand} onChange={e => setPrefs({settings: {...getPrefs().settings, brand: e.target.value as Brand}})}>
+        <select value={s.brand} onChange={e => setPrefs({settings: {...getPrefs().settings, brand: e.target.value as Brand}, brandChosen: true})}>
           {(Object.keys(BRANDS) as Brand[]).map(b => (
             <option key={b} value={b}>
               {BRANDS[b]}

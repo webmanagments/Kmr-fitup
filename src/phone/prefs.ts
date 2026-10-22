@@ -15,6 +15,7 @@ export interface Prefs {
   spent: {input: number; output: number; reads: number};
   note: string; // standing instructions for Claude, kept between sheets
   autoCheck: boolean; // second look when the reading doesn't add up
+  brandChosen?: boolean; // the fitting maker was picked by hand (else the app's default is used)
 }
 
 const KEY = 'kmr.fitup.phone.v1';
@@ -32,7 +33,8 @@ function load(): Prefs {
     code: typeof p.code === 'string' ? p.code : '',
     apiKey: typeof p.apiKey === 'string' ? p.apiKey : '',
     model: typeof p.model === 'string' ? p.model : DEFAULT_MODEL,
-    settings: {...DEFAULT_SETTINGS, ...(p.settings ?? {})},
+    settings: {...DEFAULT_SETTINGS, ...(p.settings ?? {}), ...(p.brandChosen ? {} : {brand: DEFAULT_SETTINGS.brand})},
+    brandChosen: !!p.brandChosen,
     library: Array.isArray(p.library) ? p.library : [],
     history: Array.isArray(p.history) ? p.history.slice(0, 12) : [],
     spent: p.spent ?? {input: 0, output: 0, reads: 0},

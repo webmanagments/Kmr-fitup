@@ -400,7 +400,12 @@ function Checks({sol, fix, fixAllowance, joining, maker}: {sol: Solution; fix: (
     })),
     ...sol.checks
       .filter(c => !/^Need the /.test(c.text))
-      .map((c, i) => ({key: `c${i}`, level: c.level, text: c.text, hint: c.hint, act: /allowance/i.test(c.text) && joining === 'butt_fusion' ? fixAllowance : undefined, actText: 'Set'})),
+      .map((c, i) => {
+        // A parts list drawn with another maker's fittings won't match: say that, not "warning".
+        const drawnWith = maker && /adds up with (.+?) fittings/.exec(maker)?.[1];
+        if (drawnWith && /^Pipe total .* vs BOM/.test(c.text)) return {key: `c${i}`, level: 'info', text: c.text, hint: `The drawing was worked out with ${drawnWith} fittings; your cuts use your fittings' real sizes.`};
+        return {key: `c${i}`, level: c.level, text: c.text, hint: c.hint, act: /allowance/i.test(c.text) && joining === 'butt_fusion' ? fixAllowance : undefined, actText: 'Set'};
+      }),
   ];
   const order: Record<string, number> = {error: 0, warn: 1, info: 2, ok: 3};
   rows.sort((a, b) => order[a.level] - order[b.level]);

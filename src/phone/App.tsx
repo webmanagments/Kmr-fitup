@@ -16,7 +16,6 @@ export default function App() {
   const p = usePrefs();
   const [tab, setTab] = useState<'scan' | 'setup'>(() => (getPrefs().apiKey ? 'scan' : 'setup'));
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [hint, setHint] = useState('');
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
   const [msg, setMsg] = useState<{kind: 'ok' | 'err' | 'info'; text: string} | null>(null);
@@ -60,7 +59,7 @@ export default function App() {
     try {
       const images = [];
       for (const ph of photos) images.push(await forClaude(ph));
-      const r = await readSheet(p.apiKey, images, p.model, hint, ctl.signal);
+      const r = await readSheet(p.apiKey, images, p.model, p.note, ctl.signal);
       const sp = getPrefs().spent;
       setPrefs({spent: {input: sp.input + r.usage.input, output: sp.output + r.usage.output, reads: sp.reads + 1}});
       setSheet(r.sheet);
@@ -110,7 +109,6 @@ export default function App() {
     for (const ph of photos) URL.revokeObjectURL(ph.url);
     setPhotos([]);
     setSheet(null);
-    setHint('');
     setMsg(null);
     top.current?.scrollIntoView({behavior: 'smooth'});
   };
@@ -187,8 +185,8 @@ export default function App() {
               {photos.length > 0 && (
                 <>
                   <label>
-                    Anything Claude should know? (optional)
-                    <input value={hint} onChange={e => setHint(e.target.value)} placeholder="e.g. 6 inch HDPE, the 90s are long-sweep" />
+                    Anything Claude should know? (optional, remembered for every sheet)
+                    <textarea rows={3} value={p.note} onChange={e => setPrefs({note: e.target.value})} placeholder="e.g. 6 inch HDPE, the 90s are long-sweep" />
                   </label>
                   {busy === 'reading' ? (
                     <div className="reading">

@@ -111,7 +111,8 @@ label {
   min-width: 0;
 }
 input,
-select {
+select,
+textarea {
   width: 100%;
   min-height: 44px;
   border-radius: 10px;
@@ -121,8 +122,14 @@ select {
   font-size: 16px;
   color: var(--text);
 }
+textarea {
+  resize: vertical;
+  font: inherit;
+  line-height: 1.4;
+}
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   outline: 2px solid var(--pipe);
   outline-offset: 0;
 }

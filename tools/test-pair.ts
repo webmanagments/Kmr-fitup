@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {makeJob} from '../src/core/job.ts';
 import {formatCode, normalizeCode, newPairCode, open, receiveJobs, seal, sendJob} from '../src/core/pair.ts';
-import {normalizeSheet, buildRequest, SHEET_TOOL} from '../src/core/reader.ts';
+import {normalizeSheet, buildRequest, readingFrom, SHEET_TOOL} from '../src/core/reader.ts';
 import {SHEET_3, SHEET_6} from '../src/core/samples.ts';
 import {solve} from '../src/core/solve.ts';
 
@@ -58,7 +58,12 @@ try {
   assert.deepEqual(messy.welds.map(w => w.number), ['1145']);
   assert.equal(messy.bom[0].item, 1);
   const req = buildRequest([{mediaType: 'image/jpeg', data: 'AAAA'}, {mediaType: 'image/jpeg', data: 'BBBB'}], 'claude-sonnet-5-5', 'it is 6 inch');
-  assert.equal(req.tool_choice.name, SHEET_TOOL.name);
+  assert.equal(req.tool_choice.type, 'auto');
+  assert.equal(req.tools[0].name, SHEET_TOOL.name);
+  // Reading comes from the tool call, or from JSON in a text answer.
+  assert.deepEqual(readingFrom({content: [{type: 'thinking'}, {type: 'tool_use', name: SHEET_TOOL.name, input: {legs: []}}]}), {legs: []});
+  assert.deepEqual(readingFrom({content: [{type: 'text', text: 'Here:\n```json\n{"points": [], "legs": [1]}\n```'}]}), {points: [], legs: [1]});
+  assert.equal(readingFrom({content: [{type: 'text', text: 'I cannot read this.'}]}), null);
   assert.equal((req.messages[0].content as any[]).length, 3);
   assert.match(JSON.stringify(req), /same sheet/);
   console.log('ok reader cleanup and request');

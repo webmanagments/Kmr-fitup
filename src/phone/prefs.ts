@@ -13,6 +13,7 @@ export interface Prefs {
   library: TakeoutEntry[];
   history: {id: string; name: string; at: number; job: Job}[];
   spent: {input: number; output: number; reads: number};
+  note: string; // standing instructions for Claude, kept between sheets
 }
 
 const KEY = 'kmr.fitup.phone.v1';
@@ -34,6 +35,7 @@ function load(): Prefs {
     library: Array.isArray(p.library) ? p.library : [],
     history: Array.isArray(p.history) ? p.history.slice(0, 12) : [],
     spent: p.spent ?? {input: 0, output: 0, reads: 0},
+    note: typeof p.note === 'string' ? p.note : '',
   };
 }
 

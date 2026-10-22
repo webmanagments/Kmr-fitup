@@ -141,7 +141,7 @@ Rules:
 - Weld numbers are usually handwritten in circles with a leader line pointing at the joint; match each to the point and, at a fitting, the leg whose pipe end it is on.
 - Copy the bill of materials row by row. The pipe quantity is a length.
 - Set joining to butt_fusion for HDPE / polyethylene.
-Call record_isometric once with everything.`;
+Always answer by calling the record_isometric tool exactly once with everything you read. Do not answer in plain text.`;
 
 export interface ImageIn {
   mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
@@ -151,13 +151,14 @@ export interface ImageIn {
 export function buildRequest(images: ImageIn[], model = DEFAULT_MODEL, hint = '') {
   const content: unknown[] = images.map(im => ({type: 'image', source: {type: 'base64', media_type: im.mediaType, data: im.data}}));
   const many = images.length > 1 ? `These ${images.length} photos are all of the same sheet (the first is the whole sheet, the rest are close-ups). ` : '';
-  content.push({type: 'text', text: `${many}Read this isometric and record it.${hint ? `\nFrom the fitter: ${hint}` : ''}`});
+  content.push({type: 'text', text: `${many}Read this isometric and record it.${hint ? `\nNotes from the fitter (follow them): ${hint}` : ''}`});
   return {
     model,
-    max_tokens: 16000,
+    max_tokens: 32000,
     system: SYSTEM,
     tools: [SHEET_TOOL],
-    tool_choice: {type: 'tool', name: SHEET_TOOL.name},
+    // The newest models don't allow forcing a tool, so let Claude choose; the prompt asks for it.
+    tool_choice: {type: 'auto'},
     messages: [{role: 'user', content}],
   };
 }
@@ -208,9 +209,34 @@ export async function readSheet(apiKey: string, images: ImageIn[], model = DEFAU
     if (r.status === 429 || r.status === 529 || r.status >= 500) throw new ReadError('busy', `Claude is busy right now. Try again in a minute. (${msg})`);
     throw new ReadError('bad', msg);
   }
-  const block = body?.content?.find((c: any) => c.type === 'tool_use' && c.name === SHEET_TOOL.name);
-  if (!block) throw new ReadError('refused', body?.content?.find((c: any) => c.type === 'text')?.text ?? 'Claude did not return a reading.');
-  return {sheet: normalizeSheet(block.input), usage: {input: body.usage?.input_tokens ?? 0, output: body.usage?.output_tokens ?? 0}, model: body.model ?? model};
+  const input = readingFrom(body);
+  if (!input) {
+    if (body?.stop_reason === 'max_tokens') throw new ReadError('bad', 'The reading was cut off (sheet too big). Try one photo of the whole sheet.');
+    const said = body?.content?.find((c: any) => c.type === 'text')?.text;
+    throw new ReadError('refused', said ? `Claude didn't return a reading: ${String(said).slice(0, 300)}` : "Claude didn't return a reading. Try again.");
+  }
+  return {sheet: normalizeSheet(input), usage: {input: body.usage?.input_tokens ?? 0, output: body.usage?.output_tokens ?? 0}, model: body.model ?? model};
+}
+
+/** The reading: the tool call, or (if Claude answered in text instead) a JSON object in the text. */
+export function readingFrom(body: any): any | null {
+  const content: any[] = Array.isArray(body?.content) ? body.content : [];
+  const call = content.find(c => c.type === 'tool_use' && c.name === SHEET_TOOL.name);
+  if (call?.input && typeof call.input === 'object') return call.input;
+  for (const c of content) {
+    if (c.type !== 'text' || typeof c.text !== 'string') continue;
+    const t = c.text.replace(/```(?:json)?/g, '');
+    const a = t.indexOf('{');
+    const b = t.lastIndexOf('}');
+    if (a < 0 || b <= a) continue;
+    try {
+      const o = JSON.parse(t.slice(a, b + 1));
+      if (o && (Array.isArray(o.legs) || Array.isArray(o.points))) return o;
+    } catch {
+      /* not JSON */
+    }
+  }
+  return null;
 }
 
 // ---- Cleaning up whatever came back so the rest of the app can trust the shape ------------------

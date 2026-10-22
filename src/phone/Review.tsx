@@ -144,12 +144,11 @@ export default function Review({sheet, setSheet, settings, library}: {sheet: She
                     {p.endsText[0]} → {p.endsText[1]}
                   </small>
                 </td>
-                <td className="cut">{p.status === 'ok' ? formatLength(p.cut) : p.status === 'nopipe' ? 'no pipe' : p.status === 'missing' ? 'needs take-out' : 'too short!'}</td>
+                <td className="cut">{p.status === 'ok' ? formatLength(p.cut) : p.status === 'nopipe' ? 'no pipe' : p.status === 'missing' ? 'needs fitting size' : 'too short!'}</td>
                 <td className="how">
                   {p.cc === null ? 'no length' : formatLength(p.cc)}
-                  {p.deductions.map((d, i) => (
-                    <span key={i}> − {formatLength(d.inches)}</span>
-                  ))}
+                  {p.deductions.length > 0 && <span> − take-out {formatLength(p.takeout)}</span>}
+                  {p.deductions.length > 1 && <small>take-out = {p.deductions.map(d => formatLength(d.inches)).join(' + ')}</small>}
                   {p.adjust.map((a, i) => (
                     <span key={`a${i}`}>
                       {' '}
@@ -246,9 +245,9 @@ export default function Review({sheet, setSheet, settings, library}: {sheet: She
               {key: 'point', label: 'At point', kind: 'select', options: [['', '—'], ...pointIds]},
               {key: 'inlineLeg', label: 'In-line on', kind: 'select', options: legIds},
               {key: 'size', label: 'Size', w: 60},
-              {key: 'takeout', label: 'Take-out', kind: 'len', w: 90},
+              {key: 'takeout', label: 'Centre to end', kind: 'len', w: 100},
               {key: 'branchLeg', label: 'Branch run', kind: 'select', options: legIds},
-              {key: 'branchTakeout', label: 'Branch T/O', kind: 'len', w: 90},
+              {key: 'branchTakeout', label: 'Branch C-to-E', kind: 'len', w: 100},
               {key: 'takeoutsText', label: 'Per run (L1=…)', w: 160},
               {key: 'laying', label: 'Body length', kind: 'len', w: 90},
               {key: 'bomItem', label: 'BOM #', kind: 'num', w: 56},

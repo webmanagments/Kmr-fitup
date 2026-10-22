@@ -93,6 +93,8 @@ t('sheet -6: catalog molded take-outs add up to its BOM to the 1/16"', () => {
   assert.equal(r.pieces[0].deductions[0].source, 'standard');
   assert.equal(r.pieces[0].deductions[0].inches, 8.625);
   assert.equal(r.pieces[1].deductions[1].inches, 8.5);
+  assert.equal(r.pieces[1].takeout, 17.125); // the pipe's take-out: 90 (8 5/8") + 45 (8 1/2")
+  assert.equal(r.pieces[0].takeout, 8.625);
   assert.ok(r.checks.some(c => c.level === 'ok' && /matches the BOM \(26'-4 11\/16"\)/.test(c.text)), JSON.stringify(r.checks));
   // 3' / 2'-6" take-outs can't fit: the 45 sits 8 1/2" from the wye, and the pipe falls 6'+ short of the BOM.
   const field: TakeoutEntry[] = [
@@ -108,7 +110,7 @@ t('one unknown take-out: the BOM total suggests it', () => {
   const s = structuredClone(SHEET_6);
   s.fittings[0].type = 'elbow22'; // no catalog value
   const h = solve(s);
-  assert.ok(h.checks.find(c => c.level === 'info' && /If the 6" 22½° elbow take-out is 8 5\/8"/.test(c.text)), JSON.stringify(h.checks));
+  assert.ok(h.checks.find(c => c.level === 'info' && /If the 6" 22½° elbow is 8 5\/8" centre to end/.test(c.text)), JSON.stringify(h.checks));
   assert.equal(h.missing.length, 1);
   assert.equal(h.missing[0].suggest, 8.625);
   assert.equal(h.missing[0].field, 'takeout');

@@ -111,8 +111,8 @@ export function LibraryCard() {
   };
   return (
     <div className="card">
-      <h3>Fitting take-outs</h3>
-      <p className="muted small">Centre-to-end of your fittings, from the maker's sheet. Used when the drawing doesn't print one. Without an entry here, HDPE 90s, 45s and tees use the GF Central Plastics molded DR11 catalog (6": 90 = 8 5/8", 45 = 8 1/2", tee = 9"), and steel uses ASME B16.9 long-radius.</p>
+      <h3>Fitting sizes (centre to end)</h3>
+      <p className="muted small">How far each fitting reaches from its centre (where the centrelines cross) to the face the pipe fuses to. The app adds up the fittings at both ends of a pipe to get that pipe's take-out, and subtracts it from the centre-to-centre length. Used when the drawing doesn't print one. Without an entry here, HDPE 90s, 45s and tees use the GF Central Plastics molded DR11 catalog (6": 90 = 8 5/8", 45 = 8 1/2", tee = 9"), and steel uses ASME B16.9 long-radius.</p>
       {p.library.length ? (
         <table className="results lib">
           <tbody>
@@ -125,7 +125,7 @@ export function LibraryCard() {
                   <small>{e.material === 'hdpe' ? 'HDPE' : 'Steel'}</small>
                 </td>
                 <td>
-                  {e.takeout !== null && <span>run {formatLength(e.takeout)} </span>}
+                  {e.takeout !== null && <span>{formatLength(e.takeout)} </span>}
                   {e.branch != null && <span>branch {formatLength(e.branch)} </span>}
                   {e.laying != null && <span>body {formatLength(e.laying)}</span>}
                 </td>
@@ -152,7 +152,7 @@ export function LibraryCard() {
             setPrefs({library: [...mine, ...getPrefs().library.filter(e => !mine.some(m => m.type === e.type && m.size === e.size && m.material === e.material))]});
           }}
         >
-          Try 6" 90 = 3'-0", 45 = 2'-6"
+          Try 6" 90 = 3'-0", 45 = 2'-6" (centre to end)
         </button>
         <button
           className="btn small"
@@ -185,12 +185,12 @@ export function LibraryCard() {
           </select>
         </label>
         <label>
-          Take-out (run)
+          Centre to end
           <LenInput value={to} onChange={setTo} placeholder={`e.g. 8 5/8"`} allowEmpty />
         </label>
         {(type === 'tee' || type === 'lateral') && (
           <label>
-            Branch take-out
+            Branch centre to end
             <LenInput value={br} onChange={setBr} allowEmpty />
           </label>
         )}

@@ -807,3 +807,8 @@ button:focus {
   z-index: 20;
   white-space: nowrap;
 }
+.lines li.sub {
+  padding-left: 22px;
+  font-size: 16px;
+  color: var(--muted);
+}

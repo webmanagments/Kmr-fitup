@@ -28,12 +28,12 @@ function JobCard({job, open}: {job: Job; open: () => void}) {
     <button className="job-card" data-row data-nav={`job-${job.id}`} onClick={open}>
       <span className="job-top">
         <b className="job-name">{job.name}</b>
-        {sol.missing.length ? <span className="badge red">{sol.missing.length} take-out{sol.missing.length > 1 ? 's' : ''} needed</span> : pct >= 1 ? <span className="badge green">Done ✓</span> : <span className="badge">Ready</span>}
+        {sol.missing.length ? <span className="badge red">{sol.missing.length} fitting size{sol.missing.length > 1 ? 's' : ''} needed</span> : pct >= 1 ? <span className="badge green">Done ✓</span> : <span className="badge">Ready</span>}
       </span>
       <small className="job-sub">
         {job.demo ? 'Sample · ' : ''}
         {sol.missing.length
-          ? `${sol.pieces.filter(x => x.status !== 'nopipe').length} runs · cuts wait on take-outs · ${fused}/${sol.welds.length} joints`
+          ? `${sol.pieces.filter(x => x.status !== 'nopipe').length} runs · cuts wait on fitting sizes · ${fused}/${sol.welds.length} joints`
           : `${pipes.length} pipe${pipes.length === 1 ? '' : 's'} · ${formatLength(sol.totalCut)} · ${cut}/${pipes.length} cut · ${fused}/${sol.welds.length} joints`}
       </small>
       <span className="bar" aria-hidden="true">
@@ -163,7 +163,7 @@ export function Settings() {
           }}
         >
           <span className="row-main">
-            <b className="row-mid">{sure ? 'Pinch again to clear' : 'Take-outs set on the glasses'}</b>
+            <b className="row-mid">{sure ? 'Pinch again to clear' : 'Fitting sizes set on the glasses'}</b>
             <small>{s.library.map(e => `${e.size}" ${e.type.replace('elbow', '')}`).join(', ') || 'None yet'}</small>
           </span>
           <b className="val">{s.library.length}</b>

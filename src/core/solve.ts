@@ -56,6 +56,8 @@ export interface Piece {
   endsText: [string, string];
   /** How much fitting sits at each end of the centreline run (take-out or in-line body); null = unknown. */
   ends: [number | null, number | null];
+  /** The pipe's take-out: everything the fittings at its ends use up (null while a fitting size is unknown). */
+  takeout: number | null;
 }
 
 export interface Port {
@@ -352,7 +354,7 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
       }
       if (f) {
         const port = f.ports.find(p => p.leg === l.id);
-        deductions.push({label: `${f.name}${port?.branch ? ' branch' : ''} take-out`, inches: port?.takeout ?? null, source: port?.source ?? 'none'});
+        deductions.push({label: `${f.name}${port?.branch ? ' branch' : ''}`, inches: port?.takeout ?? null, source: port?.source ?? 'none'});
         joints++;
         endDed.push(port?.takeout ?? null);
         return f.name;
@@ -395,8 +397,8 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
     const printedPipe = parseLength(l.pipe);
     const printedMatch = printedPipe !== null && net !== null && status === 'ok' ? Math.abs(net - printedPipe) <= 1 / 16 + 1e-9 : null;
     if (printedMatch === false)
-      checks.push({level: 'warn', text: `Run ${l.id}: the sheet prints pipe ${formatLength(printedPipe)}, the math gives ${formatLength(net)} (off by ${formatLength(Math.abs(net! - printedPipe!))}).`, hint: 'Usually a take-out that differs from your fittings. Check them.'});
-    if (status === 'negative') checks.push({level: 'error', text: `Run ${l.id} is shorter than its fittings (${formatLength(net)}). A take-out or dimension is wrong.`});
+      checks.push({level: 'warn', text: `Run ${l.id}: the sheet prints pipe ${formatLength(printedPipe)}, the math gives ${formatLength(net)} (off by ${formatLength(Math.abs(net! - printedPipe!))}).`, hint: 'Usually a fitting that is a different size from yours. Check the fittings.'});
+    if (status === 'negative') checks.push({level: 'error', text: `Run ${l.id} is shorter than the fittings at its ends (${formatLength(net)}). A fitting size or dimension is wrong.`});
     pieces.push({
       id: `P${i + 1}`,
       leg: l.id,
@@ -418,6 +420,7 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
       bomItem: l.bomItem,
       endsText: [fromText, toText],
       ends: [endDed[0], endDed[1]],
+      takeout: deductions.every(d => d.inches !== null) ? roundTo(deductions.reduce((s, d) => s + (d.inches ?? 0), 0)) : null,
     });
   });
   // Number the real pipe pieces 1, 2, 3 (fitting-to-fitting runs get no number).
@@ -453,7 +456,11 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
 
   // ---- 5. Checks: take-outs, allowance, bill of materials ---------------------------------------
   for (const m of missingTakeouts.values())
-    checks.push({level: 'error', text: `Need the ${m.field === 'laying' ? 'length' : 'take-out'} for ${m.label}.`, hint: 'Add it in the fitting library (from your fitting maker’s sheet), or check the drawing for a printed dimension.'});
+    checks.push({
+      level: 'error',
+      text: m.field === 'laying' ? `Need the end-to-end length of the ${m.label}.` : `Need the centre-to-end size of the ${m.label}.`,
+      hint: 'It sets the take-out on the pipes it joins. Get it from the fitting maker’s sheet or the drawing.',
+    });
   if (unsetAllowance && sheet.joining === 'butt_fusion')
     checks.push({level: 'warn', text: 'Fusion allowance is not set: cuts are shown fitting-to-fitting with nothing added for facing and bead.', hint: 'Set it in Settings from your fusion procedure.'});
 
@@ -471,7 +478,7 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
         const x = (known - bomPipe) / unknown[0].ports;
         if (x > 0 && x < 120) {
           unknown[0].suggest = roundTo(x);
-          checks.push({level: 'info', text: `If the ${unknown[0].label} ${unknown[0].field === 'laying' ? 'length' : 'take-out'} is ${formatLength(x)}, the pipe adds up to the BOM total (${formatLength(bomPipe)}).`, hint: 'Only use this if it matches your fitting sheet.'});
+          checks.push({level: 'info', text: `If the ${unknown[0].label} is ${formatLength(x)} ${unknown[0].field === 'laying' ? 'end to end' : 'centre to end'}, the pipe adds up to the BOM total (${formatLength(bomPipe)}).`, hint: 'Only use this if it matches your fitting sheet.'});
         }
       }
     } else {

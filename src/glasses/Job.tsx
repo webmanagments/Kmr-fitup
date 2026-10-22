@@ -61,11 +61,11 @@ export default function Job({job, tab, setTab, onLeave}: {job: JobT; tab: Tab; s
   const fix = (m: Missing) => {
     const size = m.size ?? sol.size ?? 6;
     const existing = lookup(libraryFor(job), m.type, size, sol.material)?.entry ?? null;
-    const what = m.field === 'branch' ? 'branch take-out' : m.field === 'laying' ? 'end-to-end length' : 'take-out';
+    const what = m.field === 'branch' ? 'branch, centre to end' : m.field === 'laying' ? 'end-to-end length' : 'centre to end';
     setStep({
       title: `${m.label.replace(' (branch)', '').replace(' (end-to-end)', '')} ${what}`,
       start: m.suggest ?? (m.field === 'laying' ? size : m.type === 'elbow90' ? size * 1.5 : size),
-      note: m.suggest ? `Starts at ${formatLength(m.suggest)}: the value that matches the BOM. Check it against your fitting sheet.` : 'Centre of the fitting to the end that the pipe fuses to. Use your fitting maker’s sheet.',
+      note: m.suggest ? `Starts at ${formatLength(m.suggest)}: the value that matches the BOM. Check it against your fitting sheet.` : 'From the centre of the fitting (where the centrelines cross) to the face the pipe fuses to. Both fittings on a pipe add up to its take-out.',
       save: v => setTakeout(m.type, size, sol.material, m.field, v, existing),
     });
   };
@@ -122,7 +122,7 @@ const fittingOf = (sol: Solution, id: string) => sol.fittings.find(f => f.id ===
 
 function math(p: Piece): string {
   if (p.cc === null) return 'Centre-to-centre not known';
-  const parts = [formatLength(p.cc), ...p.deductions.map(d => `− ${formatLength(d.inches)}`), ...p.adjust.map(a => `${(a.inches ?? 0) >= 0 ? '+' : '−'} ${formatLength(Math.abs(a.inches ?? 0))}`)];
+  const parts = [formatLength(p.cc), ...(p.deductions.length ? [`− take-out ${formatLength(p.takeout)}`] : []), ...p.adjust.map(a => `${(a.inches ?? 0) >= 0 ? '+' : '−'} ${formatLength(Math.abs(a.inches ?? 0))}`)];
   return parts.join(' ');
 }
 
@@ -137,7 +137,7 @@ function PartInfo({job, sol, part, done, fused}: {job: JobT; sol: Solution; part
           <span className="muted">{JOINING_NAME[job.sheet.joining]}</span>
         </div>
         {sol.missing.length ? (
-          <p className="big red">Waiting on {sol.missing.length === 1 ? 'a take-out' : `${sol.missing.length} take-outs`}</p>
+          <p className="big red">Needs {sol.missing.length === 1 ? 'a fitting size' : `${sol.missing.length} fitting sizes`}</p>
         ) : (
           <p className="big">
             {pipes.length} pipe{pipes.length === 1 ? '' : 's'} · {formatLength(sol.totalCut)}
@@ -167,7 +167,7 @@ function PartInfo({job, sol, part, done, fused}: {job: JobT; sol: Solution; part
           </span>
         </div>
         <p className={`big ${p.status === 'ok' ? (cut ? 'green' : 'amber') : 'red'}`}>
-          {p.status === 'ok' ? `CUT ${formatLength(p.cut)}` : p.status === 'missing' ? 'Needs a take-out' : 'Check this run'}
+          {p.status === 'ok' ? `CUT ${formatLength(p.cut)}` : p.status === 'missing' ? 'Needs a fitting size' : 'Check this run'}
           {cut && ' ✓'}
         </p>
         <p className="muted mono">{math(p)}</p>
@@ -198,7 +198,7 @@ function PartDetail({job, sol, part, done, fused, fix, close}: {job: JobT; sol: 
             .filter(p => p.status !== 'nopipe')
             .map(p => (
               <li key={p.id}>
-                <b>{p.id}</b> {p.status === 'ok' ? formatLength(p.cut) : 'needs take-out'} {done.has(p.id) && '✓'}
+                <b>{p.id}</b> {p.status === 'ok' ? formatLength(p.cut) : 'needs fitting size'} {done.has(p.id) && '✓'}
               </li>
             ))}
         </ul>
@@ -217,9 +217,14 @@ function PartDetail({job, sol, part, done, fused, fix, close}: {job: JobT; sol: 
           <li>
             Centre to centre <b>{formatLength(p.cc)}</b> <small>{SRC[p.ccSource]}</small>
           </li>
+          {p.deductions.length > 0 && (
+            <li>
+              − Take-out <b className={p.takeout === null ? 'red' : ''}>{formatLength(p.takeout)}</b>
+            </li>
+          )}
           {p.deductions.map((d, i) => (
-            <li key={i}>
-              − {d.label} <b className={d.inches === null ? 'red' : ''}>{formatLength(d.inches)}</b> <small>{SRC[d.source]}</small>
+            <li key={i} className="sub">
+              {d.label} <b className={d.inches === null ? 'red' : ''}>{formatLength(d.inches)}</b> <small>{SRC[d.source]}</small>
             </li>
           ))}
           {p.adjust.map((a, i) => (
@@ -242,7 +247,7 @@ function PartDetail({job, sol, part, done, fused, fix, close}: {job: JobT; sol: 
           )}
           {missing && (
             <button className="btn primary" data-autofocus onClick={() => fix(missing)}>
-              Set take-out
+              Set fitting size
             </button>
           )}
           <button className="btn" onClick={close}>
@@ -260,12 +265,12 @@ function PartDetail({job, sol, part, done, fused, fix, close}: {job: JobT; sol: 
       <div className="row">
         {ms.map(m => (
           <button key={m.field} className="btn primary" data-autofocus onClick={() => fix(m)}>
-            Set {m.field === 'branch' ? 'branch' : m.field === 'laying' ? 'length' : 'take-out'}
+            Set {m.field === 'branch' ? 'branch size' : m.field === 'laying' ? 'length' : 'size'}
           </button>
         ))}
         {!ms.length && f.ports.length > 0 && f.ports.every(p => p.source !== 'printed') && (
           <button className="btn" onClick={() => fix({label: f.name.replace(/ \(item \d+\)$/, ''), type: f.fitting.type, size: sol.size, field: 'takeout', ports: f.ports.length, suggest: f.ports[0].takeout ?? undefined})}>
-            Change take-out
+            Change size
           </button>
         )}
         <button className="btn" data-autofocus={ms.length ? undefined : true} onClick={close}>
@@ -281,7 +286,7 @@ function FittingLines({f}: {f: SFitting}) {
     <ul className="lines">
       {f.ports.map((pt, i) => (
         <li key={i}>
-          {pt.branch ? 'Branch' : 'Run'} take-out <b className={pt.takeout === null ? 'red' : ''}>{formatLength(pt.takeout)}</b> <small>{SRC[pt.source]}</small>
+          {pt.branch ? 'Branch' : 'Run'} centre to end <b className={pt.takeout === null ? 'red' : ''}>{formatLength(pt.takeout)}</b> <small>{SRC[pt.source]}</small>
         </li>
       ))}
       {f.pos && (
@@ -315,8 +320,9 @@ function Cuts({job, sol, done, fix}: {job: JobT; sol: Solution; done: Set<string
           >
             <b className="chip">{p.id}</b>
             <span className="row-main">
-              <b className={`row-big ${p.status === 'ok' ? '' : 'red'}`}>{p.status === 'ok' ? formatLength(p.cut) : p.status === 'missing' ? 'needs take-out' : 'check run'}</b>
+              <b className={`row-big ${p.status === 'ok' ? '' : 'red'}`}>{p.status === 'ok' ? formatLength(p.cut) : p.status === 'missing' ? 'needs fitting size' : 'check run'}</b>
               <small>
+                {p.takeout !== null && p.deductions.length ? `take-out ${formatLength(p.takeout)} · ` : ''}
                 {p.endsText[0]} → {p.endsText[1]}
               </small>
             </span>
@@ -374,13 +380,13 @@ function Checks({sol, fix, fixAllowance, joining}: {sol: Solution; fix: (m: Miss
     ...sol.missing.map((m, i) => ({
       key: `m${i}`,
       level: 'error',
-      text: `Need the ${m.field === 'laying' ? 'length' : 'take-out'} for ${m.label}`,
+      text: m.field === 'laying' ? `Need the end-to-end length of the ${m.label}` : `Need the centre-to-end size of the ${m.label}`,
       hint: m.suggest ? `BOM says about ${formatLength(m.suggest)}` : 'Pinch to set it',
       act: () => fix(m),
       actText: 'Set',
     })),
     ...sol.checks
-      .filter(c => !/^Need the (take-out|length)/.test(c.text))
+      .filter(c => !/^Need the /.test(c.text))
       .map((c, i) => ({key: `c${i}`, level: c.level, text: c.text, hint: c.hint, act: /allowance/i.test(c.text) && joining === 'butt_fusion' ? fixAllowance : undefined, actText: 'Set'})),
   ];
   const order: Record<string, number> = {error: 0, warn: 1, info: 2, ok: 3};

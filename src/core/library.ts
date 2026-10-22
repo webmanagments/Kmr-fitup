@@ -24,6 +24,7 @@ export interface TakeoutEntry {
   outlet?: number | null; // laterals: centre to the outlet end (the run end the branch points away from); null = same as takeout
   laying?: number | null; // end-to-end of an in-line fitting
   note?: string;
+  other?: string; // a catalog size from a different maker than the job's (shown as a warning)
 }
 
 export interface Settings {
@@ -37,6 +38,8 @@ export interface Settings {
   stickLength: number;
   /** Lost at each cut (saw kerf / squaring), for stick planning only. */
   cutWaste: number;
+  /** Who made the molded HDPE fittings on the job (their sizes differ by maker). */
+  brand: Brand;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -45,6 +48,7 @@ export const DEFAULT_SETTINGS: Settings = {
   socketGap: 1 / 16,
   stickLength: 40 * 12,
   cutWaste: 1 / 4,
+  brand: 'gf',
 };
 
 // ASME B16.9 long-radius butt-weld fittings, centre-to-end in inches. (Standard values; always
@@ -64,11 +68,45 @@ const TEE: Record<string, number> = {
   '5': 4 + 7 / 8, '6': 5 + 5 / 8, '8': 7, '10': 8 + 1 / 2, '12': 10, '14': 11, '16': 12, '18': 13 + 1 / 2, '20': 15, '24': 17,
 };
 
-// GF Central Plastics IPS DR11 molded butt fittings (industrial HDPE catalog), centre-to-end "z"
-// in inches. Tees: run centre-to-end is half the overall length z; branch is z2.
-const HDPE90: Record<string, number> = {'2': 4.68, '3': 6.75, '4': 6.38, '6': 8.63, '8': 11.1, '10': 13.38, '12': 15.25};
-const HDPE45: Record<string, number> = {'2': 3.5, '3': 5.3, '4': 6.25, '6': 8.5, '8': 9.75, '10': 13.38, '12': 15.88};
-const HDPETEE: Record<string, [number, number]> = {'2': [4.64, 4.5], '3': [5.88, 5.88], '4': [7.25, 7.25], '6': [9, 9], '8': [11.75, 11.75], '10': [13.38, 13.5], '12': [16, 15.88]};
+// ---- Molded HDPE butt-fusion fittings, IPS SDR 11, by maker ---------------------------------
+// Centre-to-end in inches (tees: run and branch). Makers differ by up to ~2", so the job's maker
+// is a setting. Sources:
+//  - GF Central Plastics, IPS & DIPS Industrial & Municipal catalog: butt 90° and 45° elbows "z",
+//    equal tees overall "z" (run = z ÷ 2) and branch "z2". These are the sizes the Black & Veatch
+//    sheets were drawn with: sheets -6 (6"), -11 (4"), -13 and -2 (6") add up to their bills of
+//    materials to the 1/16" with them.
+//  - Integrifuse (Integrity Fusion Products) butt fusion catalog: 90° / 45° "A" (centre to end:
+//    the tee's half-run equals the 90's A, and A + OD/2 = the 90's outside dimension E), tees "B",
+//    reducers and caps "A" (overall length), flange adapters "D" (length).
+export type Brand = 'gf' | 'integrifuse';
+export const BRANDS: Record<Brand, string> = {gf: 'GF Central Plastics', integrifuse: 'Integrifuse'};
+
+interface MakerTable {
+  e90: Record<string, number>;
+  e45: Record<string, number>;
+  tee: Record<string, [number, number]>;
+  reducer: Record<string, number>; // "6x4" → end to end
+  cap: Record<string, number>;
+  flange: Record<string, number>; // flange adapter length
+}
+const MAKERS: Record<Brand, MakerTable> = {
+  gf: {
+    e90: {'2': 4.68, '3': 6.75, '4': 6.38, '6': 8.63, '8': 11.1, '10': 13.38, '12': 15.25},
+    e45: {'2': 3.5, '3': 5.3, '4': 6.25, '6': 8.5, '8': 9.75, '10': 13.38, '12': 15.88},
+    tee: {'2': [4.64, 4.5], '3': [5.88, 5.88], '4': [7.25, 7.25], '6': [9, 9], '8': [11.75, 11.75], '10': [13.38, 13.5], '12': [16, 15.88]},
+    reducer: {},
+    cap: {},
+    flange: {},
+  },
+  integrifuse: {
+    e90: {'2': 4.25, '3': 5.91, '4': 6.89, '6': 9.06, '8': 11.81},
+    e45: {'2': 3.23, '3': 4.72, '4': 5.31, '6': 6.89, '8': 8.46},
+    tee: {'2': [4.33, 4.33], '3': [5.91, 5.91], '4': [6.89, 6.89], '6': [9.06, 9.06], '8': [11.81, 11.81]},
+    reducer: {'3x2': 7.87, '4x2': 9.06, '4x3': 9.06, '6x3': 11.03, '6x4': 11.42, '8x6': 12.8},
+    cap: {'2': 3.23, '3': 4.72, '4': 5.31, '6': 6.89, '8': 8.66},
+    flange: {'2': 6.1, '3': 6.1, '4': 6.1, '6': 8.07, '8': 10.67},
+  },
+};
 const sixteenth = (x: number) => Math.round(x * 16) / 16;
 
 // Fittings as modelled on the Black & Veatch HDPE isometrics (line 13WWD / 23WWD sheets). Worked
@@ -80,17 +118,42 @@ const sixteenth = (x: number) => Math.round(x * 16) / 16;
 // A floor-drain hub end (BU … TYPE A) takes nothing: the pipe runs to the printed point.
 const SHEETS = 'From the B&V HDPE isometrics (matches their BOMs)';
 
-export function builtIn(type: FittingType, size: number, material: Material, size2?: number | null): TakeoutEntry | null {
+function makerFitting(brand: Brand, type: FittingType, size: number, material: Material, size2?: number | null): TakeoutEntry | null {
+  const t = MAKERS[brand];
+  const k = String(size);
+  const note = `${BRANDS[brand]} molded, IPS SDR 11 catalog`;
+  const id = `${brand}-${type}-${k}${size2 ? `x${size2}` : ''}`;
+  if (type === 'elbow90' && t.e90[k]) return {id, type, size, material, takeout: sixteenth(t.e90[k]), note};
+  if (type === 'elbow45' && t.e45[k]) return {id, type, size, material, takeout: sixteenth(t.e45[k]), note};
+  if (type === 'tee' && t.tee[k]) return {id, type, size, material, takeout: sixteenth(t.tee[k][0]), branch: sixteenth(t.tee[k][1]), note};
+  if (type === 'reducer' && size2 && t.reducer[`${k}x${size2}`]) return {id, type, size, size2, material, takeout: null, laying: sixteenth(t.reducer[`${k}x${size2}`]), note};
+  if (type === 'cap' && t.cap[k]) return {id, type, size, material, takeout: sixteenth(t.cap[k]), laying: sixteenth(t.cap[k]), note};
+  if (type === 'flange' && t.flange[k]) return {id, type, size, material, takeout: sixteenth(t.flange[k]), laying: sixteenth(t.flange[k]), note: `${BRANDS[brand]} flange adapter`};
+  return null;
+}
+
+function sheetFitting(type: FittingType, size: number, material: Material, size2?: number | null): TakeoutEntry | null {
+  if (type === 'lateral' && size === 6) return {id: 'bv-lateral-6', type, size, material, takeout: 26.6875, outlet: 0, branch: 27.375, note: SHEETS};
+  if (type === 'cleanout' && size === 6) return {id: 'bv-cleanout-6', type, size, material, takeout: null, laying: 15.125, note: SHEETS};
+  if (type === 'reducer' && size === 6 && size2 === 4) return {id: 'bv-reducer-6x4', type, size, size2: 4, material, takeout: null, laying: 9.25, note: SHEETS};
+  return null;
+}
+
+/**
+ * A catalog size for a fitting. HDPE: the job's maker first, then the sizes worked out from the
+ * B&V sheets, then the other maker (marked as such so the app can say so).
+ */
+export function builtIn(type: FittingType, size: number, material: Material, size2?: number | null, brand: Brand = 'gf'): TakeoutEntry | null {
   const k = String(size);
   if (material === 'hdpe') {
-    const note = 'GF Central Plastics molded, IPS DR11 catalog';
-    if (type === 'elbow90' && HDPE90[k]) return {id: `gf-90-${k}`, type, size, material, takeout: sixteenth(HDPE90[k]), note};
-    if (type === 'elbow45' && HDPE45[k]) return {id: `gf-45-${k}`, type, size, material, takeout: sixteenth(HDPE45[k]), note};
-    if (type === 'tee' && HDPETEE[k]) return {id: `gf-tee-${k}`, type, size, material, takeout: sixteenth(HDPETEE[k][0]), branch: sixteenth(HDPETEE[k][1]), note};
-    if (type === 'lateral' && size === 6) return {id: 'bv-lateral-6', type, size, material, takeout: 26.6875, outlet: 0, branch: 27.375, note: SHEETS};
-    if (type === 'cleanout' && size === 6) return {id: 'bv-cleanout-6', type, size, material, takeout: null, laying: 15.125, note: SHEETS};
-    if (type === 'reducer' && size === 6 && size2 === 4) return {id: 'bv-reducer-6x4', type, size, size2: 4, material, takeout: null, laying: 9.25, note: SHEETS};
-    return null;
+    // The B&V-derived 6"x4" reducer is the GF-drawn one; the maker's own table wins when it has one.
+    const own = makerFitting(brand, type, size, material, size2);
+    if (own) return own;
+    const drawn = sheetFitting(type, size, material, size2);
+    if (drawn) return drawn;
+    const otherBrand = (Object.keys(MAKERS) as Brand[]).find(b => b !== brand)!;
+    const other = makerFitting(otherBrand, type, size, material, size2);
+    return other ? {...other, other: BRANDS[otherBrand]} : null;
   }
   if (type === 'elbow90') return {id: `b16.9-90-${k}`, type, size, material, takeout: LR90(size), note: 'ASME B16.9 long-radius 90°'};
   if (type === 'elbow45' && LR45[k]) return {id: `b16.9-45-${k}`, type, size, material, takeout: LR45[k], note: 'ASME B16.9 long-radius 45°'};
@@ -104,11 +167,11 @@ export function builtIn(type: FittingType, size: number, material: Material, siz
   return null;
 }
 
-export function lookup(lib: TakeoutEntry[], type: FittingType, size: number | null, material: Material, size2?: number | null): {entry: TakeoutEntry; source: 'library' | 'standard'} | null {
+export function lookup(lib: TakeoutEntry[], type: FittingType, size: number | null, material: Material, size2?: number | null, brand: Brand = 'gf'): {entry: TakeoutEntry; source: 'library' | 'standard'} | null {
   if (size === null) return null;
   const same2 = (e: TakeoutEntry) => !e.size2 || !size2 || Math.abs(e.size2 - size2) < 1e-6;
   const mine = lib.find(e => e.type === type && Math.abs(e.size - size) < 1e-6 && e.material === material && same2(e));
   if (mine) return {entry: mine, source: 'library'};
-  const std = builtIn(type, size, material, size2);
+  const std = builtIn(type, size, material, size2, brand);
   return std ? {entry: std, source: 'standard'} : null;
 }

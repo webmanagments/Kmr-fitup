@@ -2,7 +2,7 @@
 // take-outs set on the glasses, and setting overrides. Saved in this app's local storage.
 import {useSyncExternalStore} from 'react';
 import type {Job, Progress} from '../core/job.ts';
-import type {Settings, TakeoutEntry} from '../core/library.ts';
+import {DEFAULT_SETTINGS, type Settings, type TakeoutEntry} from '../core/library.ts';
 import {newPairCode} from '../core/pair.ts';
 import {solve, type Solution} from '../core/solve.ts';
 
@@ -11,7 +11,7 @@ export interface State {
   jobs: Job[]; // newest first
   progress: Record<string, Progress>;
   library: TakeoutEntry[]; // take-outs set on the glasses (win over the phone's)
-  overrides: Partial<Pick<Settings, 'fusionAllowance' | 'stickLength'>>;
+  overrides: Partial<Pick<Settings, 'fusionAllowance' | 'stickLength' | 'brand'>>;
   seen: string[]; // job ids already received (so a re-send isn't added twice)
 }
 
@@ -121,7 +121,8 @@ export const clearLibrary = () => set({library: []});
 export const setOverride = (o: State['overrides']) => set({overrides: {...state.overrides, ...o}});
 
 export function settingsFor(job: Job): Settings {
-  return {...job.settings, ...state.overrides};
+  const set = Object.fromEntries(Object.entries(state.overrides).filter(([, v]) => v !== undefined));
+  return {...DEFAULT_SETTINGS, ...job.settings, ...set};
 }
 
 export function libraryFor(job: Job): TakeoutEntry[] {

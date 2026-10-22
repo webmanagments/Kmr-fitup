@@ -18,7 +18,7 @@ const ang = (a: number) => (a === 11.25 ? '11¼°' : a === 22.5 ? '22½°' : `${
 function catalogTakeout(size: number, angle: number): number | null {
   const type = angle === 90 ? 'elbow90' : angle === 45 ? 'elbow45' : angle === 22.5 ? 'elbow22' : angle === 11.25 ? 'elbow11' : null;
   if (!type) return null;
-  const e = lookup(getState().library, type, size, 'hdpe')?.entry ?? lookup([], type, size, 'steel')?.entry;
+  const e = lookup(getState().library, type, size, 'hdpe', null, getState().overrides.brand ?? 'gf')?.entry ?? lookup([], type, size, 'steel')?.entry;
   return e?.takeout ?? null;
 }
 

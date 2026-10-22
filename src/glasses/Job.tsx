@@ -10,7 +10,8 @@ import {useCapture} from './keys.ts';
 import {Modal, Stepper} from './Modal.tsx';
 import ModelView, {useParts} from './ModelView.tsx';
 import Paged from './Paged.tsx';
-import {getState, libraryFor, progressOf, removeJob, setOverride, setTakeout, solveJob, toggle, useStore} from './store.ts';
+import {getState, libraryFor, progressOf, removeJob, setOverride, setTakeout, settingsFor, solveJob, toggle, useStore} from './store.ts';
+import {makerLine} from '../core/makers.ts';
 import {dirOf, focusEl} from '../lib/spatial.ts';
 
 export type Tab = 'model' | 'cuts' | 'welds' | 'checks' | 'sheet';
@@ -60,7 +61,7 @@ export default function Job({job, tab, setTab, onLeave}: {job: JobT; tab: Tab; s
 
   const fix = (m: Missing) => {
     const size = m.size ?? sol.size ?? 6;
-    const existing = lookup(libraryFor(job), m.type, size, sol.material, m.size2)?.entry ?? null;
+    const existing = lookup(libraryFor(job), m.type, size, sol.material, m.size2, settingsFor(job).brand)?.entry ?? null;
     const what = m.field === 'branch' ? 'branch, centre to end' : m.field === 'outlet' ? 'outlet, centre to end' : m.field === 'laying' ? 'end-to-end length' : 'centre to end';
     setStep({
       title: `${m.label.replace(/ \((branch|outlet)\)$/, '')} ${what}`,
@@ -108,7 +109,7 @@ export default function Job({job, tab, setTab, onLeave}: {job: JobT; tab: Tab; s
         )}
         {tab === 'cuts' && <Cuts job={job} sol={sol} done={done} fix={fix} />}
         {tab === 'welds' && <Welds job={job} sol={sol} fused={fused} />}
-        {tab === 'checks' && <Checks sol={sol} fix={fix} fixAllowance={fixAllowance} joining={job.sheet.joining} />}
+        {tab === 'checks' && <Checks sol={sol} fix={fix} fixAllowance={fixAllowance} joining={job.sheet.joining} maker={makerLine(job.sheet, settingsFor(job), formatLength)} />}
         {tab === 'sheet' && <SheetTab job={job} sol={sol} onDelete={onLeave} />}
       </div>
       {detail !== undefined && <PartDetail job={job} sol={sol} part={detail} done={done} fused={fused} fix={fix} close={() => setDetail(undefined)} />}
@@ -386,7 +387,7 @@ function Welds({job, sol, fused}: {job: JobT; sol: Solution; fused: Set<string>}
   );
 }
 
-function Checks({sol, fix, fixAllowance, joining}: {sol: Solution; fix: (m: Missing) => void; fixAllowance: () => void; joining: string}) {
+function Checks({sol, fix, fixAllowance, joining, maker}: {sol: Solution; fix: (m: Missing) => void; fixAllowance: () => void; joining: string; maker: string | null}) {
   type Row = {key: string; level: string; text: string; hint?: string; act?: () => void; actText?: string};
   const rows: Row[] = [
     ...sol.missing.map((m, i) => ({
@@ -403,6 +404,7 @@ function Checks({sol, fix, fixAllowance, joining}: {sol: Solution; fix: (m: Miss
   ];
   const order: Record<string, number> = {error: 0, warn: 1, info: 2, ok: 3};
   rows.sort((a, b) => order[a.level] - order[b.level]);
+  if (maker) rows.push({key: 'maker', level: /adds up with/.test(maker) ? 'ok' : 'info', text: maker});
   if (joining === 'butt_fusion' && !rows.some(r => /allowance/i.test(r.text))) rows.push({key: 'allow', level: 'info', text: 'Fusion allowance', hint: 'Pinch to change it', act: fixAllowance, actText: 'Set'});
   return (
     <div className="list-tab">

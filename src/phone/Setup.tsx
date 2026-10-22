@@ -1,6 +1,6 @@
 // Phone settings: Claude key and model, shop numbers, and the fitting take-out library.
 import {useState} from 'react';
-import {DEFAULT_SETTINGS, type Material, type TakeoutEntry} from '../core/library.ts';
+import {BRANDS, DEFAULT_SETTINGS, type Brand, type Material, type TakeoutEntry} from '../core/library.ts';
 import {MODELS} from '../core/reader.ts';
 import {FITTING_NAME, type FittingType} from '../core/types.ts';
 import {formatLength, parseLength, parseSize} from '../core/units.ts';
@@ -71,6 +71,16 @@ export function ShopCard() {
   return (
     <div className="card">
       <h3>Shop numbers</h3>
+      <label>
+        Who made the HDPE fittings? (it's stamped on them)
+        <select value={s.brand} onChange={e => setPrefs({settings: {...getPrefs().settings, brand: e.target.value as Brand}})}>
+          {(Object.keys(BRANDS) as Brand[]).map(b => (
+            <option key={b} value={b}>
+              {BRANDS[b]}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="grid2">
         <label>
           HDPE fusion allowance per end
@@ -155,13 +165,13 @@ export function LibraryCard() {
           className="btn small"
           onClick={() => {
             const mine: TakeoutEntry[] = [
-              {id: 'elbow90-6-hdpe', type: 'elbow90', size: 6, material: 'hdpe', takeout: 36, branch: null, laying: null, note: 'Field number (unverified)'},
-              {id: 'elbow45-6-hdpe', type: 'elbow45', size: 6, material: 'hdpe', takeout: 30, branch: null, laying: null, note: 'Field number (unverified)'},
+              {id: 'elbow90-6-hdpe', type: 'elbow90', size: 6, material: 'hdpe', takeout: 9, branch: null, laying: null, note: "Coworker's number"},
+              {id: 'elbow45-6-hdpe', type: 'elbow45', size: 6, material: 'hdpe', takeout: 6, branch: null, laying: null, note: "Coworker's number"},
             ];
             setPrefs({library: [...mine, ...getPrefs().library.filter(e => !mine.some(m => m.type === e.type && m.size === e.size && m.material === e.material))]});
           }}
         >
-          Try 6" 90 = 3'-0", 45 = 2'-6" (centre to end)
+          Coworker's 6": 90 = 9", 45 = 6"
         </button>
         <button
           className="btn small"

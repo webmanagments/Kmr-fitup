@@ -32,14 +32,14 @@ cut = centre-to-centre − take-out at each end − in-line fitting bodies
 Rounded to the nearest 1/16". Take-outs come from the drawing first, then your own library
 (phone Setup, or set on the glasses), then catalog values:
 
-- **HDPE:** GF Central Plastics molded butt-fusion fittings, IPS DR11, 2"–12" 90s, 45s and equal
-  tees (6": 90 = 8 5/8", 45 = 8 1/2", tee = 9"). The sample sheet -6 adds up to its bill of
-  materials to the 1/16" with these. Other makers differ (Integrifuse 6" 90 = 9.06", 45 = 6.89"),
-  so check the fittings on your job.
-- **From the B&V HDPE sheets** (each matches its bill of materials to the 1/16"): 6" x 6" molded
-  lateral wye = 2'-2 11/16" centre to heel, 0" to outlet, 2'-3 3/8" to branch (the centre is where
-  the branch meets the run); 6" cleanout CO1 = 15 1/8" from the top point to the fusion face;
-  6" x 4" concentric reducer = 9 1/4" end to end; floor drain hubs (BU … TYPE A) take nothing.
+- **HDPE, by maker** (Setup → "Who made the HDPE fittings?"; sizes differ by up to ~2"):
+  - *GF Central Plastics* (IPS & DIPS Industrial catalog): 2"–12" 90s, 45s and equal tees.
+    6": 90 = 8 5/8", 45 = 8 1/2", tee = 9". 4": 90 = 6 3/8", 45 = 6 1/4".
+  - *Integrifuse / Integrity Fusion* (butt fusion catalog): 2"–8" 90s, 45s, tees, reducers, caps
+    and flange adapters. 6": 90 = 9 1/16", 45 = 6 7/8", tee = 9 1/16".
+  - If the chosen maker has no figure for a fitting, the other maker's is used and flagged.
+  - The app also says which maker's sizes make each sheet add up to its own parts list (the B&V
+    sheets add up with GF to the 1/16").
 - **Steel:** ASME B16.9 long-radius.
 
 If only one take-out is missing, FitUp suggests the value that makes the pipe add up to the BOM

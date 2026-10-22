@@ -1,6 +1,7 @@
 // Review what Claude read, fix anything, and see the results update live before sending.
 import {useMemo, useState, type ReactNode} from 'react';
-import type {Settings, TakeoutEntry} from '../core/library.ts';
+import {BRANDS, type Settings, type TakeoutEntry} from '../core/library.ts';
+import {makerLine} from '../core/makers.ts';
 import {solve} from '../core/solve.ts';
 import {FITTING_NAME, JOINING_NAME, type BomItem, type FittingType, type Joining, type Leg, type Point, type Sheet, type Weld} from '../core/types.ts';
 import {formatLength, parseLength} from '../core/units.ts';
@@ -86,6 +87,7 @@ const JOINS = Object.entries(JOINING_NAME) as [Joining, string][];
 
 export default function Review({sheet, setSheet, settings, library}: {sheet: Sheet; setSheet: (s: Sheet) => void; settings: Settings; library: TakeoutEntry[]}) {
   const sol = useMemo(() => solve(sheet, settings, library), [sheet, settings, library]);
+  const maker = useMemo(() => makerLine(sheet, settings, formatLength), [sheet, settings]);
   const [sel, setSel] = useState<string | null>(null);
   const up = (p: Partial<Sheet>) => setSheet({...sheet, ...p});
   const pointIds: [string, string][] = sheet.points.map(p => [p.id, p.id]);
@@ -163,7 +165,9 @@ export default function Review({sheet, setSheet, settings, library}: {sheet: She
         <p className="muted">
           Total {formatLength(sol.totalCut)}
           {sol.plan.length ? ` · ${sol.plan.length} stick${sol.plan.length > 1 ? 's' : ''} of ${formatLength(settings.stickLength)}` : ''}
+          {` · ${BRANDS[settings.brand ?? 'gf']} fittings`}
         </p>
+        {maker && <p className="maker-line">{maker}</p>}
       </div>
 
       <div className="card">

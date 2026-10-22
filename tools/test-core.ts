@@ -4,6 +4,7 @@ import {DEFAULT_SETTINGS, lookup, type TakeoutEntry} from '../src/core/library.t
 import {EXAMPLE, SHEET_11, SHEET_13, SHEET_2, SHEET_3, SHEET_6} from '../src/core/samples.ts';
 import {parseDirection, solve} from '../src/core/solve.ts';
 import {formatLength, parseLength, parseSize} from '../src/core/units.ts';
+import {makerFits, makerLine} from '../src/core/makers.ts';
 import {angleFor, cutFromTravel, elbowTakeout, equalSpread, miter, offset, rollingOffset} from '../src/core/fitmath.ts';
 
 let n = 0;
@@ -130,7 +131,7 @@ t('HDPE catalog covers 2"-12" 90s, 45s and tees', () => {
   assert.deepEqual([lk('lateral', 6)!.takeout, lk('lateral', 6)!.outlet, lk('lateral', 6)!.branch], [26.6875, 0, 27.375]);
   assert.equal(lk('cleanout', 6)!.laying, 15.125);
   assert.equal(lookup([], 'reducer', 6, 'hdpe', 4)!.entry.laying, 9.25);
-  assert.equal(lookup([], 'reducer', 6, 'hdpe', 3), null);
+  assert.equal(lookup([], 'reducer', 6, 'hdpe', 3)!.entry.other, 'Integrifuse'); // no GF size: the other maker's, flagged
   assert.equal(lookup([{id: 'x', type: 'elbow90', size: 6, material: 'hdpe', takeout: 9}], 'elbow90', 6, 'hdpe')!.source, 'library');
 });
 t('sheet -13: cleanout riser, rolled 45s and lateral add up to the BOM (25\'-3 5/16")', () => {
@@ -215,5 +216,30 @@ t('fitter math: offsets, rolling offsets, elbow take-outs, miters', () => {
   assert.equal(lk('cap', 6)!.laying, 3.5);
   assert.equal(lk('flange', 6)!.laying, 3.5);
   assert.equal(lk('elbow22', 6)!.takeout, 1.8125); // 9 × tan 11.25° = 1.79
+});
+t('fitting makers: Integrifuse sizes, fallbacks and which maker a sheet was drawn with', () => {
+  const lk = (type: any, size: number, s2?: number) => lookup([], type, size, 'hdpe', s2, 'integrifuse')?.entry;
+  assert.equal(lk('elbow90', 6)!.takeout, 9.0625);
+  assert.equal(lk('elbow45', 6)!.takeout, 6.875);
+  assert.equal(lk('elbow90', 2)!.takeout, 4.25);
+  assert.equal(lk('tee', 4)!.branch, 6.875);
+  assert.equal(lk('reducer', 4, 2)!.laying, 9.0625);
+  assert.equal(lk('cap', 6)!.takeout, 6.875);
+  assert.equal(lk('lateral', 6)!.note, 'From the B&V HDPE isometrics (matches their BOMs)'); // no Integrifuse figure: the drawings'
+  assert.equal(lk('elbow90', 10)!.other, 'GF Central Plastics'); // Integrifuse doesn't list 10": GF, flagged
+  // Sheet -6 under Integrifuse: P2 = 22'-11 1/4" − 9 1/16" − 6 7/8"
+  const r = solve(SHEET_6, {...DEFAULT_SETTINGS, brand: 'integrifuse'});
+  assert.equal(formatLength(r.pieces[1].cut), `21'-7 5/16"`);
+  // A missing size from the chosen maker uses the other's and says so.
+  const s = structuredClone(SHEET_6);
+  s.fittings[0].size = '10"';
+  assert.ok(solve(s, {...DEFAULT_SETTINGS, brand: 'integrifuse'}).checks.some(c => /Using the GF Central Plastics size for the 10" 90° elbow/.test(c.text)));
+  // Which maker the sheets add up with
+  const fmt = formatLength;
+  for (const sh of [SHEET_6, SHEET_11, SHEET_13]) assert.match(makerLine(sh, DEFAULT_SETTINGS, fmt)!, /adds up with GF Central Plastics/);
+  const fits = makerFits(SHEET_6, DEFAULT_SETTINGS);
+  assert.equal(fits.find(f => f.brand === 'gf')!.off, 0);
+  // Integrifuse's shorter 45 would leave a 1 5/8" pipe between the 45 and the wye too: 2 3/8" over.
+  assert.equal(fits.find(f => f.brand === 'integrifuse')!.off, 2.375);
 });
 console.log(`\n${n} passed`);

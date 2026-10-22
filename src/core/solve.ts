@@ -6,7 +6,7 @@
 // Every number keeps its source (coordinates, printed, your library, standard) so the wearer
 // can see exactly where it came from. Nothing is guessed silently: missing data stays missing
 // and is reported.
-import {DEFAULT_SETTINGS, lookup, type Material, type Settings, type TakeoutEntry} from './library.ts';
+import {BRANDS, DEFAULT_SETTINGS, lookup, type Material, type Settings, type TakeoutEntry} from './library.ts';
 import {FITTING_NAME, type Fitting, type FittingType, type Leg, type Sheet} from './types.ts';
 import {formatLength, parseLength, parseSize, roundTo} from './units.ts';
 
@@ -261,9 +261,12 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
   const fittings: SFitting[] = [];
   const fitAt = new Map<string, SFitting>(); // centre point → fitting
   const missingTakeouts = new Map<string, Missing>(); // "elbow90|6" → count
+  const brand = settings.brand ?? 'gf';
+  const otherMaker = new Map<string, string>(); // fitting → the other maker whose size was used
   for (const f of sheet.fittings) {
     const sz = fittingSize(f, sheet);
-    const found = lookup(lib, f.type, sz, material, fittingSize2(f));
+    const found = lookup(lib, f.type, sz, material, fittingSize2(f), brand);
+    if (found?.entry.other) otherMaker.set(`${sizeLabel(f, sz)}${FITTING_NAME[f.type]}`, found.entry.other);
     const ports: Port[] = [];
     const legsHere = f.point ? sheet.legs.filter(l => l.from === f.point || l.to === f.point) : [];
     // A lateral's two run ends differ: the heel (the side the branch leans towards) is long, the
@@ -361,7 +364,8 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
       if (inline) {
         const sf = fittings.find(x => x.id === inline.id)!;
         const sz = fittingSize(inline, sheet);
-        const found = lookup(lib, inline.type, sz, material, fittingSize2(inline));
+        const found = lookup(lib, inline.type, sz, material, fittingSize2(inline), brand);
+        if (found?.entry.other && parseLength(inline.laying) === null) otherMaker.set(`${sizeLabel(inline, sz)}${FITTING_NAME[inline.type]}`, found.entry.other);
         const printed = parseLength(inline.laying);
         const lay = printed ?? found?.entry.laying ?? null;
         deductions.push({label: `${sf.name} body`, inches: lay, source: printed !== null ? 'printed' : lay !== null ? found!.source : 'none'});
@@ -478,6 +482,12 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
   }
 
   // ---- 5. Checks: take-outs, allowance, bill of materials ---------------------------------------
+  for (const [label, maker] of otherMaker)
+    checks.push({
+      level: 'warn',
+      text: `Using the ${maker} size for the ${label}: there's no ${BRANDS[brand]} size on file for it.`,
+      hint: 'Check one of the fittings, or set its size in the fitting library.',
+    });
   for (const m of missingTakeouts.values())
     checks.push({
       level: 'error',

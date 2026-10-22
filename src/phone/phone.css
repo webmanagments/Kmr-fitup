@@ -795,3 +795,9 @@ table {
   white-space: nowrap;
   color: var(--amber);
 }
+.maker-line {
+  font-size: 14px;
+  color: var(--pipe);
+  border-left: 3px solid var(--pipe);
+  padding-left: 10px;
+}

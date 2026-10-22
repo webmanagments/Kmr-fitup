@@ -7,7 +7,7 @@ import {formatLength} from '../core/units.ts';
 import {Stepper} from './Modal.tsx';
 import Paged from './Paged.tsx';
 import {addJobs, clearLibrary, getState, newCode, progressOf, setOverride, solveJob, useStore} from './store.ts';
-import {DEFAULT_SETTINGS} from '../core/library.ts';
+import {BRANDS, DEFAULT_SETTINGS, type Brand} from '../core/library.ts';
 
 export type Link = 'ok' | 'rules' | 'offline' | 'idle';
 /** The sheet last opened, so coming back lands on its page. */
@@ -147,6 +147,7 @@ export function Settings() {
   const [edit, setEdit] = useState<'allow' | 'stick' | null>(null);
   const [sure, setSure] = useState(false);
   const allow = s.overrides.fusionAllowance;
+  const brand = s.overrides.brand;
   const stick = s.overrides.stickLength;
   return (
     <div className="screen settings">
@@ -166,6 +167,19 @@ export function Settings() {
             <small>For planning cuts from full sticks</small>
           </span>
           <b className="val">{stick === undefined ? 'from phone' : formatLength(stick)}</b>
+        </button>
+        <button
+          className="row-btn"
+          onClick={() => {
+            const order: (Brand | undefined)[] = [undefined, 'gf', 'integrifuse'];
+            setOverride({brand: order[(order.indexOf(brand) + 1) % order.length]});
+          }}
+        >
+          <span className="row-main">
+            <b className="row-mid">Fitting maker</b>
+            <small>HDPE fitting sizes differ by maker: pinch to change</small>
+          </span>
+          <b className="val">{brand ? BRANDS[brand] : 'from phone'}</b>
         </button>
         <button
           className={`row-btn ${sure ? 'danger' : ''}`}

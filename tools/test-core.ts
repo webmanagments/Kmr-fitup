@@ -70,6 +70,18 @@ t('fusion allowance is added per fused end; root gap taken off for steel', () =>
   assert.equal(steel.material, 'steel');
   assert.deepEqual(steel.pieces.map(p => formatLength(p.cut)), [`9'-6 7/8"`, `49'-1 3/4"`, `7'-8 7/8"`]);
 });
+t('the 45 on a wye branch is found however the reading puts it', () => {
+  const asFitting = structuredClone(SHEET_3B);
+  const end = asFitting.points.find(p => p.id === 'B1')!;
+  end.kind = 'center';
+  delete end.cont;
+  end.label = 'Cont. on ISO-29';
+  asFitting.fittings.push({id: 'F9', type: 'elbow45', point: 'B1', size: '6"'});
+  const r = solve(asFitting, DEFAULT_SETTINGS);
+  assert.ok(!r.checks.some(c => c.level === 'error'), JSON.stringify(r.checks));
+  assert.equal(r.fittings.length, 2);
+  assert.match(r.pieces.find(p => p.leg === 'L6')!.direct!, /45° elbow on sheet ISO-29 fuses straight onto the 6" 45° lateral wye branch/);
+});
 t('extra length per pipe goes on once; a feet-for-inches typo is fixed to 3"', () => {
   const r = solve(EXAMPLE, {...DEFAULT_SETTINGS, fusionAllowance: 3});
   assert.deepEqual(r.pieces.map(p => formatLength(p.cut)), [`9'-10"`, `49'-5"`, `8'-0"`]);
@@ -179,7 +191,16 @@ t('sheet -11 (4"): 90, 45 and a 6x4 reducer add up to the BOM (24\'-2")', () => 
   assert.equal(r.size, 4);
 });
 t('sheet 10WWD -3: two wyes and a mid-run joint; the long pipe is exactly one 40\' stick', () => {
-  for (const settings of [GF, DEFAULT_SETTINGS]) {
+  // Drawn with wyes 34 7/16" long (the BOM adds up); the Integrity Fusion wyes on site are 33 3/4".
+  const site = solve(SHEET_3B, DEFAULT_SETTINGS);
+  assert.ok(site.ready, JSON.stringify(site.checks));
+  assert.deepEqual(site.pieces.filter(p => p.status === 'ok').map(p => formatLength(p.takeout)), [`2'-9 3/4"`, `6 3/16"`, `0"`]);
+  assert.deepEqual(site.pieces.filter(p => p.status === 'ok').map(p => formatLength(p.cut)), [`16'-3 9/16"`, `40'-1 9/16"`, `6'-6 3/16"`]);
+  // Heel 7/8" past the -2 break, branch 1 13/16" short of the drawing's: no slivers to cut, the next sheets shift.
+  const slivers = site.pieces.filter(p => p.status === 'nopipe');
+  assert.deepEqual(slivers.map(p => p.carry), [-7 / 8, 1 + 13 / 16, 1 + 13 / 16]);
+  assert.ok(!site.checks.some(c => c.level === 'error'));
+  for (const settings of [GF]) {
     const r = solve(SHEET_3B, settings);
     assert.ok(r.ready, JSON.stringify(r.checks));
     assert.deepEqual(r.pieces.filter(p => p.status === 'ok').map(p => formatLength(p.cut)), [`16'-2 7/8"`, `40'-0"`, `6'-6 3/16"`]);
@@ -264,14 +285,15 @@ t('fitting makers: Integrifuse sizes, fallbacks and which maker a sheet was draw
   assert.equal(lk('tee', 4)!.branch, 7);
   assert.equal(lk('reducer', 6, 4)!.laying, 11.4375); // 11.42
   assert.equal(lk('cap', 6)!.takeout, 7.0625); // 7.08
-  const wye = lk('lateral', 6)!; // item 100906: the drawings' figures (34 7/16" overall = Integrifuse's catalog length)
-  assert.deepEqual([wye.takeout, wye.outlet, wye.branch], [26.6875, 7.75, 27.375]);
+  const wye = lk('lateral', 6)!; // item 100906, the wyes on site: 2'-9 3/4" take-out between two of them
+  assert.deepEqual([wye.takeout, wye.outlet, wye.branch], [27.5625, 6.1875, 25.5625]);
   assert.equal(lk('elbow90', 10)!.other, 'GF Central Plastics'); // Integrifuse doesn't list 10": GF, flagged
   assert.equal(lk('cleanout', 6)!.note, 'From the B&V HDPE isometrics (matches their BOMs)'); // no maker figure: the drawings'
   // Sheet -6 with Integrifuse fittings: P1 = 5'-7 3/16" − 8 13/16", P2 = 22'-11 1/4" − 8 13/16" − 6 7/16",
-  // and the shorter 45 leaves a 2 1/16" piece before the -3 wye.
+  // and the shorter 45 still fuses straight onto the -3 wye's branch: no 2 1/16" sliver to cut, sheet -3 shifts.
   const r = solve(SHEET_6);
-  assert.deepEqual(r.pieces.map(p => formatLength(p.cut)), [`4'-10 3/8"`, `21'-8"`, '2 1/16"']);
+  assert.deepEqual(r.pieces.map(p => formatLength(p.cut)), [`4'-10 3/8"`, `21'-8"`, '—']);
+  assert.equal(r.pieces[2].carry, 2 + 1 / 16);
   // A missing size from the chosen maker uses the other's and says so.
   const s = structuredClone(SHEET_6);
   s.fittings[0].size = '10"';
@@ -281,7 +303,7 @@ t('fitting makers: Integrifuse sizes, fallbacks and which maker a sheet was draw
   for (const sh of [SHEET_6, SHEET_11, SHEET_13]) assert.match(makerLine(sh, GF, fmt)!, /adds up with GF Central Plastics/);
   const fits = makerFits(SHEET_6, GF);
   assert.equal(fits.find(f => f.brand === 'gf')!.off, 0);
-  // Integrifuse's longer 90 takes 3/8" more; its shorter 45 leaves 2 1/16" more on P2 and a new 2 1/16" piece.
-  assert.equal(fits.find(f => f.brand === 'integrifuse')!.off, 3.75);
+  // Integrifuse's longer 90 takes 3/8" more; its shorter 45 leaves 2 1/16" more on P2.
+  assert.equal(fits.find(f => f.brand === 'integrifuse')!.off, 1.6875);
 });
 console.log(`\n${n} passed`);

@@ -164,6 +164,7 @@ export default function Review({sheet, setSheet, settings, library}: {sheet: She
           Total {formatLength(sol.totalCut)}
           {sol.plan.length ? ` · ${sol.plan.length} stick${sol.plan.length > 1 ? 's' : ''} of ${formatLength(settings.stickLength)}` : ''}
           {` · ${BRANDS[settings.brand ?? 'gf']} fittings`}
+          {sol.pieces.some(p => p.adjust.length) ? ` · cuts include ${formatLength(settings.fusionAllowance)} extra ${settings.allowancePer === 'end' ? 'per fused end' : 'per pipe'}` : ''}
         </p>
         {maker && <p className="maker-line">{maker}</p>}
       </div>

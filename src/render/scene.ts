@@ -203,7 +203,7 @@ export function buildModel(sheet: Sheet, sol: Solution): Model {
     // square to the run (as the drawing's dashed bend shows).
     const piece = leg && sol.pieces.find(p => p.leg === leg.id);
     const wye = leg && sol.fittings.find(f => f.fitting.type === 'lateral' && f.fitting.point === (leg.from === pt.id ? leg.to : leg.from));
-    const next = sheet.points.find(x => x.id === pt.id)?.next ?? (wye?.ports.find(x => x.leg === leg!.id)?.branch ? 'elbow45' : null);
+    const next = pt.next ?? (wye?.ports.find(x => x.leg === leg!.id)?.branch ? 'elbow45' : null);
     if (pt.cont && piece?.status === 'nopipe' && wye && next === 'elbow45') {
       const runLeg = wye.ports.map(x => legOf.get(x.leg)).find(l => l && l.id !== leg!.id);
       const runOther = runLeg && posOf.get(runLeg.from === wye.fitting.point ? runLeg.to : runLeg.from);

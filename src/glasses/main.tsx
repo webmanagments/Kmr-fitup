@@ -2,6 +2,9 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './styles.css';
+import {keepFresh} from '../lib/fresh.ts';
+
+keepFresh(5000);
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root mount element');

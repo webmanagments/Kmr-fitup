@@ -88,7 +88,7 @@ try {
   check('Opens the sheet on the 3D view', (await focused()) === 'model');
   await shot('03-model');
   await noClip('model');
-  check('ISO-6 is ready with Integrifuse sizes (the fittings on site)', (await g.textContent('.info')).includes(`3 pipes · 26'-8 7/16"`), await g.textContent('.info'));
+  check('ISO-6 is ready with Integrifuse sizes (the fittings on site)', (await g.textContent('.info')).includes(`2 pipes · 26'-6 3/8"`), await g.textContent('.info'));
   await key('ArrowRight', 1, 500);
   const info1 = await g.textContent('.info');
   check('Right selects the first part', /P1/.test(info1) && info1.includes(`CUT 4'-10 3/8"`), info1.slice(0, 80));
@@ -132,7 +132,7 @@ try {
   check('Cuts tab', (await focused()) === 'tab-cuts');
   await key('ArrowDown');
   const cuts = await g.locator('.row-big').allTextContents();
-  check('ISO-6 cuts with 2 7/8" extra per pipe: 5\'-1 1/4", 21\'-10 7/8", 4 15/16"', cuts.join(',') === `5'-1 1/4",21'-10 7/8",4 15/16"`, cuts.join(', '));
+  check('ISO-6 cuts with 2 7/8" extra per pipe: 5\'-1 1/4", 21\'-10 7/8" (the 45 fuses straight onto the -3 wye)', cuts.join(',') === `5'-1 1/4",21'-10 7/8"`, cuts.join(', '));
   await key('Enter', 1, 300);
   check('Pinch marks a cut', (await g.locator('.row-btn.done').count()) === 1);
   await shot('08-cuts');
@@ -169,7 +169,7 @@ try {
   check('Back again goes home', (await g.locator('.home').count()) === 1);
   check('Home returns to the card used', (await focused()).startsWith('job-demo2'));
   const sub = await g.evaluate(() => document.activeElement?.textContent ?? '');
-  check('Card shows progress', sub.includes('1/3 cut') && sub.includes('1/3 joints'), sub);
+  check('Card shows progress', sub.includes('1/2 cut') && sub.includes('1/3 joints'), sub);
   await shot('12-home-progress');
   check('Overflowing text', (await overflow()).length === 0, (await overflow()).join(', '));
 
@@ -251,7 +251,7 @@ try {
   await ph.click('.samples .btn:text-is("ISO-3")');
   await ph.waitForTimeout(400);
   const pcuts = await ph.locator('.results .cut').allTextContents();
-  check('Phone shows the -3 cut list', pcuts.includes(`19'-1 9/16"`), pcuts.join(', '));
+  check('Phone shows the -3 cut list', pcuts.includes(`19'-6 1/8"`), pcuts.join(', '));
   shots && (await ph.screenshot({path: `${shots}/p-02-review.png`, fullPage: true}));
   // Edit: rename and send
   await ph.fill('.title-input', 'DEMO-ISO-77');

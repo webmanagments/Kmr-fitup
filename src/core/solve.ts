@@ -25,6 +25,7 @@ export interface SPoint {
   posSource: 'printed' | 'derived' | 'guess' | 'none';
   label?: string;
   cont?: string;
+  next?: FittingType | null;
   fitting?: string;
 }
 
@@ -60,6 +61,8 @@ export interface Piece {
   takeout: number | null;
   /** No pipe here: what fuses straight onto what (e.g. the next sheet's 45 onto a wye branch). */
   direct?: string;
+  /** At a sheet break: how much the next sheet shifts because your fitting differs from the drawing's (+ = toward the fitting). */
+  carry?: number;
 }
 
 export interface Port {
@@ -190,7 +193,40 @@ function sizeLabel(f: Fitting, sz: number | null): string {
   return sz ? (s2 && s2 !== sz ? `${sz}" x ${s2}" ` : `${sz}" `) : '';
 }
 
-export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: TakeoutEntry[] = []): Solution {
+/** Up to this much left over (or short) between a fitting and a sheet break is not a pipe to cut. */
+const SLIVER = 3;
+const shiftText = (carry: number | undefined, where: string) =>
+  !carry
+    ? ''
+    : carry > 0
+      ? ` Your fitting is ${formatLength(carry)} shorter there than the drawing's, so everything on ${where} sits ${formatLength(carry)} closer.`
+      : ` Your fitting is ${formatLength(-carry)} longer there than the drawing's, so everything on ${where} starts ${formatLength(-carry)} further out.`;
+
+/**
+ * An elbow drawn at the far end of a run with nothing beyond it is the next sheet's fitting (the
+ * dashed bend past a "Cont on" box), not one to take out on this sheet: record it on that end.
+ */
+const contOf = (label: string) => label.replace(/^.*?cont(inue[sd]?)?\.?\s*(on)?:?\s*/i, '') || label;
+
+function nextSheetFittings(input: Sheet): Sheet {
+  // A "Cont on …" end the reader only labelled: it's still a sheet break.
+  const sheet = input.points.some(p => p.kind === 'end' && !p.cont && /\bcont/i.test(p.label ?? ''))
+    ? {...input, points: input.points.map(p => (p.kind === 'end' && !p.cont && /\bcont/i.test(p.label ?? '') ? {...p, cont: contOf(p.label!)} : p))}
+    : input;
+  const ghosts = sheet.fittings.filter(f => /^elbow/.test(f.type) && f.point && sheet.legs.filter(l => l.from === f.point || l.to === f.point).length === 1);
+  if (!ghosts.length) return sheet;
+  return {
+    ...sheet,
+    fittings: sheet.fittings.filter(f => !ghosts.includes(f)),
+    points: sheet.points.map(p => {
+      const g = ghosts.find(f => f.point === p.id);
+      return g ? {...p, kind: 'end' as const, next: p.next ?? g.type, cont: p.cont ?? (p.label && /\bcont/i.test(p.label) ? contOf(p.label) : 'next sheet')} : p;
+    }),
+  };
+}
+
+export function solve(input: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: TakeoutEntry[] = []): Solution {
+  const sheet = nextSheetFittings(input);
   const checks: Check[] = [];
   const material = materialOf(sheet);
   const size = parseSize(sheet.size);
@@ -436,13 +472,24 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
     let net: number | null = null;
     let cut: number | null = null;
     let status: Piece['status'] = 'missing';
+    let carry: number | undefined;
     if (cc !== null && deductions.every(d => d.inches !== null)) {
       net = cc - deductions.reduce((s, d) => s + (d.inches ?? 0), 0);
       const c = net + adjust.reduce((s, d) => s + (d.inches ?? 0), 0);
       if (net < -1 / 4) status = 'negative';
       else if (net < 0.5) status = 'nopipe';
       else status = 'ok';
+      // Fitting to a sheet break with only a sliver left over (or a sliver too much): the drawing
+      // meant the next sheet's piece to fuse straight onto the fitting. Your fitting is a little
+      // longer or shorter than the designer's, so the next sheet shifts by that much instead.
+      const breakEnd = [l.from, l.to].some(pid => byPoint.get(pid)?.kind === 'end' && byPoint.get(pid)?.cont);
+      const fitEnd = [l.from, l.to].some(pid => fitAt.has(pid));
+      if (breakEnd && fitEnd && Math.abs(net) < SLIVER && status !== 'nopipe') {
+        status = 'nopipe';
+        carry = roundTo(net);
+      }
       cut = status === 'ok' ? roundTo(c) : null;
+      if (status === 'nopipe') adjust.length = 0; // nothing cut, nothing added
       net = roundTo(net);
     }
     const printedPipe = parseLength(l.pipe);
@@ -472,6 +519,7 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
       endsText: [fromText, toText],
       ends: [endDed[0], endDed[1]],
       takeout: deductions.every(d => d.inches !== null) ? roundTo(deductions.reduce((s, d) => s + (d.inches ?? 0), 0)) : null,
+      carry,
     });
   });
   // Fitting to fitting with no pipe: say what fuses onto what. At a sheet break the next fitting is
@@ -492,12 +540,13 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
       const branch = f?.fitting.type === 'lateral' && f.ports.find(x => x.leg === p.leg)?.branch;
       const next = pt.next && FITTING_NAME[pt.next] ? pt.next : branch ? 'elbow45' : null;
       const sheetNo = pt.cont.replace(/^.*-(?=[^-]+-\d+$)/, '');
+      const where = pt.cont === 'next sheet' ? 'the next sheet' : `sheet ${sheetNo}`;
       if (!next) {
-        p.direct = `No pipe on this sheet: the ${name(otherId) ?? 'fitting'} ends right at the break to sheet ${sheetNo}.`;
+        p.direct = `No pipe on this sheet: the ${name(otherId) ?? 'fitting'} ends right at the break to ${where}.${shiftText(p.carry, where)}`;
         return;
       }
-      p.endsText[i] = `${FITTING_NAME[next]} (sheet ${sheetNo})`;
-      p.direct = `No pipe: the ${FITTING_NAME[next]} on sheet ${sheetNo} fuses straight onto the ${name(otherId) ?? 'fitting'}.`;
+      p.endsText[i] = `${FITTING_NAME[next]} (${where})`;
+      p.direct = `No pipe: the ${FITTING_NAME[next]} on ${where} fuses straight onto the ${name(otherId) ?? 'fitting'}.${shiftText(p.carry, where)}`;
     });
     if (!p.direct) {
       const a = name(p.from);
@@ -576,7 +625,7 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
         checks.push({
           level: 'warn',
           text: `Pipe total ${formatLength(totalNet)} vs BOM ${formatLength(bomPipe)} (${diff > 0 ? 'over' : 'under'} by ${formatLength(Math.abs(diff))}).`,
-          hint: 'The BOM is often rounded or counts pipe differently; trust the dimensions you can verify.',
+          hint: "If your fittings are a different size from the ones the drawing was laid out with, the pipe adds up differently; your cuts use your fittings' sizes. BOMs are also often rounded.",
         });
     }
   }
@@ -599,7 +648,18 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
     let s = plan.find(x => x.offcut >= need);
     if (!s) {
       if (need > settings.stickLength + settings.cutWaste) {
-        checks.push({level: 'warn', text: `${p.id} (${formatLength(p.cut)}) is longer than a ${formatLength(settings.stickLength)} stick: it needs a fusion joint or a longer stick.`});
+        // At a mid-run field joint, the joint can move: the neighbouring pipe takes up the rest.
+        const over = roundTo((p.cut ?? 0) - settings.stickLength);
+        const jointEnd = [p.from, p.to].find(pid => !fitAt.has(pid) && byPoint.get(pid)?.kind === 'center');
+        const next = jointEnd && pieces.find(q => q !== p && q.status === 'ok' && (q.from === jointEnd || q.to === jointEnd));
+        const w = jointEnd && sheet.welds.find(x => x.point === jointEnd)?.number;
+        checks.push({
+          level: 'warn',
+          text: `${p.id} (${formatLength(p.cut)}) is longer than a ${formatLength(settings.stickLength)} stick by ${formatLength(over)}.`,
+          hint: next
+            ? `Move the field joint${w ? ` ${w}` : ''} ${formatLength(over)} toward ${next.id}: ${p.id} is then a full ${formatLength(settings.stickLength)} stick and ${next.id} is cut at ${formatLength((next.cut ?? 0) + over)}.`
+            : 'It needs a fusion joint or a longer stick.',
+        });
         continue;
       }
       s = {stick: plan.length + 1, pieces: [], used: 0, offcut: settings.stickLength};
@@ -610,7 +670,7 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
     s.offcut -= need;
   }
 
-  const points: SPoint[] = sheet.points.map(p => ({id: p.id, kind: p.kind, pos: pos.get(p.id) ?? null, posSource: posSrc.get(p.id) ?? 'none', label: p.label, cont: p.cont, fitting: fitAt.get(p.id)?.id}));
+  const points: SPoint[] = sheet.points.map(p => ({id: p.id, kind: p.kind, pos: pos.get(p.id) ?? null, posSource: posSrc.get(p.id) ?? 'none', label: p.label, cont: p.cont, next: p.next, fitting: fitAt.get(p.id)?.id}));
   const ready = pieces.every(p => p.status === 'ok' || p.status === 'nopipe') && !checks.some(c => c.level === 'error');
   return {material, size, points, pieces, fittings, welds, checks, totalCut, totalNet, bomPipe, plan, ready, missing: [...missingTakeouts.values()]};
 }

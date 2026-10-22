@@ -123,8 +123,9 @@ const MAKERS: Record<Brand, MakerTable> = {
     reducer: {'3x2': 7.72, '4x2': 7.76, '4x3': 9.0, '6x3': 11.42, '6x4': 11.42, '8x6': 12.8},
     cap: {'2': 3.3, '3': 4.58, '4': 5.2, '6': 7.08, '8': 8.68},
     flange: {'2': 6.1, '3': 6.1, '4': 6.1, '6': 8.07, '8': 10.67},
-    // 6": the figures your drawings add up with (34 7/16" overall = Integrifuse's catalog length).
-    lateral: {'2': [18.46, 5.28, 13.1], '3': [17.92, 6.0, 13.46], '4': [22.22, 5.74, 20.5], '6': [26.6875, 7.75, 27.375], '8': [30.0, 6.5, 27.7]},
+    // 6" (item 100906, the wyes on site): heel 27 9/16", outlet 6 3/16" (33 3/4" overall, the take-out
+    // the fitters confirmed between two wyes), branch 25 9/16".
+    lateral: {'2': [18.46, 5.28, 13.1], '3': [17.92, 6.0, 13.46], '4': [22.22, 5.74, 20.5], '6': [27.56, 6.18, 25.54], '8': [30.0, 6.5, 27.7]},
   },
 };
 const sixteenth = (x: number) => Math.round(x * 16) / 16;

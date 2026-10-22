@@ -31,7 +31,9 @@ cut = centre-to-centre − take-out at each end − in-line fitting bodies
 
 The extra length is set in Setup → Shop numbers (anything over 6" is treated as a typo and reset
 to 3"). Where fittings fuse straight together there's no pipe to cut; at a wye branch that ends at
-a sheet break, the next sheet's 45 goes straight on (drawn dashed in the 3D view).
+a sheet break, the next sheet's 45 goes straight on (drawn dashed in the 3D view). Between a
+fitting and a sheet break, anything under 3" either way is not a pipe: your fitting is just a
+little longer or shorter than the designer's, and the app says how far the next sheet shifts.
 
 Rounded to the nearest 1/16". Take-outs come from the drawing first, then your own library
 (phone Setup, or set on the glasses), then catalog values:

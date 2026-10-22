@@ -207,7 +207,7 @@ const ONE_SHEET = (n: number) =>
 
 export function buildRequest(images: ImageIn[], model = DEFAULT_MODEL, hint = '', extra?: string) {
   const content: unknown[] = photoBlocks(images);
-  content.push({type: 'text', text: `${ONE_SHEET(images.length)}Read this isometric and record it.${hint ? `\nNotes from the fitter (follow them): ${hint}` : ''}${extra ? `\n\n${extra}` : ''}`});
+  content.push({type: 'text', text: `${ONE_SHEET(images.length)}Read this isometric and record it.${hint ? `\nNotes from the fitter, about how to read this sheet: ${hint}\n(Use them only to read the drawing. Copy every dimension, length and coordinate exactly as printed: never add, subtract or round anything because of a note. Extra cut length, allowances and take-outs are worked out by the app, not by you.)` : ''}${extra ? `\n\n${extra}` : ''}`});
   return {
     model,
     max_tokens: 32000,

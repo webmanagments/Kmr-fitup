@@ -5,6 +5,8 @@ import {CODE_LEN, formatCode, normalizeCode, sendJob} from '../core/pair.ts';
 import {checkPrompt, readingProblems, readSheet, ReadError} from '../core/reader.ts';
 import {SAMPLES} from '../core/samples.ts';
 import type {Sheet} from '../core/types.ts';
+import {formatLength} from '../core/units.ts';
+import {BUILD} from '../lib/fresh.ts';
 import {forClaude, forGlasses, loadPhoto, type Photo} from './image.ts';
 import {getPrefs, setPrefs, usePrefs} from './prefs.ts';
 import Calc from './Calc.tsx';
@@ -205,6 +207,7 @@ export default function App() {
           <button className="btn primary wide" onClick={() => setTab('scan')}>
             Done
           </button>
+          <p className="muted small version">Version {BUILD}</p>
         </>
       )}
 
@@ -223,6 +226,24 @@ export default function App() {
           {!sheet && (
             <div className="card">
               <h3>1. Photograph the sheet</h3>
+              {p.noteCleared && (
+                <div className="notice">
+                  <p>
+                    Your saved note to Claude said “{p.noteCleared}”. Claude was following it while reading, which threw the lengths off, so it's been taken out. Extra pipe length is set in Setup → Shop numbers: now {p.settings.fusionAllowance ? formatLength(p.settings.fusionAllowance) : 'nothing'} {p.settings.allowancePer === 'end' ? 'on each fused end' : 'once per pipe'}.
+                  </p>
+                  <button className="btn small" onClick={() => setPrefs({noteCleared: undefined})}>
+                    Got it
+                  </button>
+                </div>
+              )}
+              {p.note && !photos.length && (
+                <p className="muted small saved-note">
+                  Saved note to Claude: “{p.note}”{' '}
+                  <button className="link-btn" onClick={() => setPrefs({note: ''})}>
+                    clear
+                  </button>
+                </p>
+              )}
               <p className="muted small">Flat, square-on and in good light. One photo of the whole sheet, or several of its parts (drawing, title block, bill of materials, close-ups of busy spots): up to 8 photos, all read together as one sheet.</p>
               {photos.length > 1 && <p className="photo-count">{photos.length} photos · read together as one sheet</p>}
               <div className="photos">
@@ -257,7 +278,7 @@ export default function App() {
               {photos.length > 0 && (
                 <>
                   <label>
-                    Anything Claude should know? (optional, remembered for every sheet)
+                    Anything Claude should know to read it? (optional, remembered for every sheet; extra length goes in Setup)
                     <textarea rows={3} value={p.note} onChange={e => setPrefs({note: e.target.value})} placeholder="e.g. 6 inch HDPE, the 90s are long-sweep" />
                   </label>
                   {reading ? (

@@ -128,8 +128,8 @@ export function drawModel(ctx: CanvasRenderingContext2D, model: Model, cam: Came
     const width = Math.max(3, t.r * 2 * cam.scale);
     const isSel = t.part === sel;
     const done = t.kind === 'pipe' && o.done?.has(t.part);
-    const col = t.ghost ? c.end : t.unknown ? c.unknown : t.kind === 'fitting' ? c.fitting : done ? c.done : c.pipe;
-    const hi = t.ghost ? c.end : t.unknown ? '#ffc2cc' : t.kind === 'fitting' ? c.fitHi : done ? '#c4ffd9' : c.pipeHi;
+    const col = t.ghost ? c.fitting : t.unknown ? c.unknown : t.kind === 'fitting' ? c.fitting : done ? c.done : c.pipe;
+    const hi = t.ghost ? c.fitHi : t.unknown ? '#ffc2cc' : t.kind === 'fitting' ? c.fitHi : done ? '#c4ffd9' : c.pipeHi;
     for (let i = 0; i < t.pts.length - 1; i++) {
       const a = P(t.pts[i]);
       const b = P(t.pts[i + 1]);

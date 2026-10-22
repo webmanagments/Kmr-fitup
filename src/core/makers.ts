@@ -1,7 +1,7 @@
 // Which maker's fittings make a sheet add up to its own bill of materials? The designer drew the
 // sheet with one maker's sizes; if the pipe total only works out with one of them, that's what
 // the sheet expects on site.
-import {BRANDS, type Brand, type Settings, type TakeoutEntry} from './library.ts';
+import {BRANDS, builtIn, type Brand, type Settings, type TakeoutEntry} from './library.ts';
 import {solve} from './solve.ts';
 import type {Sheet} from './types.ts';
 
@@ -15,7 +15,10 @@ export function makerFits(sheet: Sheet, settings: Settings): MakerFit[] {
   return (Object.keys(BRANDS) as Brand[]).map(brand => {
     const sol = solve(sheet, {...settings, brand}, [] as TakeoutEntry[]);
     const complete = sol.pieces.every(p => p.status === 'ok' || p.status === 'nopipe');
-    return {brand, name: BRANDS[brand], off: complete && sol.bomPipe ? sol.totalNet - sol.bomPipe : null};
+    // A maker with none of this sheet's fittings in its catalog is really the drawing's own sizes.
+    const own = sol.fittings.filter(f => f.ports.length || f.fitting.inlineLeg).map(f => builtIn(f.fitting.type, sol.size ?? 6, sol.material, null, brand));
+    const anyMaker = own.some(e => e?.id.startsWith(`${brand}-`));
+    return {brand, name: anyMaker || !own.length ? BRANDS[brand] : "the drawing's own", off: complete && sol.bomPipe ? sol.totalNet - sol.bomPipe : null};
   });
 }
 

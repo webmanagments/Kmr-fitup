@@ -8,6 +8,7 @@ import {Stepper} from './Modal.tsx';
 import Paged from './Paged.tsx';
 import {addJobs, clearLibrary, getState, newCode, progressOf, setOverride, solveJob, useStore} from './store.ts';
 import {BRANDS, DEFAULT_SETTINGS, MAX_ALLOWANCE, type Brand} from '../core/library.ts';
+import {BUILD} from '../lib/fresh.ts';
 
 export type Link = 'ok' | 'rules' | 'offline' | 'idle';
 /** The sheet last opened, so coming back lands on its page. */
@@ -152,7 +153,7 @@ export function Settings() {
   return (
     <div className="screen settings">
       <h2>Settings</h2>
-      <p className="muted">These override what the phone sends, for every sheet on the glasses.</p>
+      <p className="muted">These override what the phone sends, for every sheet on the glasses. Version {BUILD}</p>
       <div className="set-rows">
         <button className="row-btn" data-autofocus onClick={() => setEdit('allow')}>
           <span className="row-main">

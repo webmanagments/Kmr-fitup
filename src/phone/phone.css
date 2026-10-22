@@ -801,3 +801,20 @@ table {
   border-left: 3px solid var(--pipe);
   padding-left: 10px;
 }
+.version {
+  text-align: center;
+  margin-top: 12px;
+}
+.notice {
+  border: 1px solid var(--amber);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 8px 0 12px;
+  background: color-mix(in srgb, var(--amber) 10%, transparent);
+}
+.notice p {
+  margin: 0 0 8px;
+}
+.saved-note {
+  overflow-wrap: anywhere;
+}

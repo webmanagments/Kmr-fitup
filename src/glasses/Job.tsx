@@ -351,13 +351,16 @@ function Cuts({job, sol, done, fix}: {job: JobT; sol: Solution; done: Set<string
                 <b className={`row-big ${p.status === 'ok' ? '' : 'red'}`}>{p.status === 'ok' ? formatLength(p.cut) : p.status === 'missing' ? 'needs fitting size' : 'check run'}</b>
                 <small>
                   {p.takeout !== null && p.deductions.length ? `take-out ${formatLength(p.takeout)} · ` : ''}
+                  {p.status === 'ok' && p.adjust.length ? `${p.adjust.map(a => `${(a.inches ?? 0) < 0 ? '−' : '+'}${formatLength(Math.abs(a.inches ?? 0))}`).join(' ')} extra · ` : ''}
                   {p.endsText[0]} → {p.endsText[1]}
                 </small>
               </span>
             )}
-            <span className={`tick ${done.has(p.id) ? 'on' : ''}`} aria-label={done.has(p.id) ? 'cut' : 'not cut'}>
-              {done.has(p.id) ? '✓' : ''}
-            </span>
+            {p.status !== 'nopipe' && (
+              <span className={`tick ${done.has(p.id) ? 'on' : ''}`} aria-label={done.has(p.id) ? 'cut' : 'not cut'}>
+                {done.has(p.id) ? '✓' : ''}
+              </span>
+            )}
           </button>
         )}
         empty={<p className="empty">No pipe to cut on this sheet: the fittings join each other directly.</p>}
@@ -419,7 +422,7 @@ function Checks({sol, fix, fixAllowance, joining, maker}: {sol: Solution; fix: (
       .map((c, i) => {
         // A parts list drawn with another maker's fittings won't match: say that, not "warning".
         const drawnWith = maker && /adds up with (.+?) fittings/.exec(maker)?.[1];
-        if (drawnWith && /^Pipe total .* vs BOM/.test(c.text)) return {key: `c${i}`, level: 'info', text: c.text, hint: `The drawing was worked out with ${drawnWith} fittings; your cuts use your fittings' real sizes.`};
+        if (drawnWith && /^Pipe total .* vs BOM/.test(c.text)) return {key: `c${i}`, level: 'info', text: c.text, hint: /^the drawing/.test(drawnWith) ? "The drawing was laid out with fitting sizes a little different from yours; your cuts use your fittings' real sizes." : `The drawing was worked out with ${drawnWith} fittings; your cuts use your fittings' real sizes.`};
         return {key: `c${i}`, level: c.level, text: c.text, hint: c.hint, act: /allowance|Extra length/i.test(c.text) && joining === 'butt_fusion' ? fixAllowance : undefined, actText: 'Set'};
       }),
   ];

@@ -111,7 +111,8 @@ const MAKERS: Record<Brand, MakerTable> = {
     reducer: {'3x2': 7.72, '4x2': 7.76, '4x3': 9.0, '6x3': 11.42, '6x4': 11.42, '8x6': 12.8},
     cap: {'2': 3.3, '3': 4.58, '4': 5.2, '6': 7.08, '8': 8.68},
     flange: {'2': 6.1, '3': 6.1, '4': 6.1, '6': 8.07, '8': 10.67},
-    lateral: {'2': [18.46, 5.28, 13.1], '3': [17.92, 6.0, 13.46], '4': [22.22, 5.74, 20.5], '6': [27.56, 6.18, 25.54], '8': [30.0, 6.5, 27.7]},
+    // 6": the figures your drawings add up with (34 7/16" overall = Integrifuse's catalog length).
+    lateral: {'2': [18.46, 5.28, 13.1], '3': [17.92, 6.0, 13.46], '4': [22.22, 5.74, 20.5], '6': [26.6875, 7.75, 27.375], '8': [30.0, 6.5, 27.7]},
   },
 };
 const sixteenth = (x: number) => Math.round(x * 16) / 16;
@@ -119,8 +120,10 @@ const sixteenth = (x: number) => Math.round(x * 16) / 16;
 // Fittings as modelled on the Black & Veatch HDPE isometrics (line 13WWD / 23WWD sheets). Worked
 // out from sheets whose pipe totals match their bills of materials to the 1/16":
 //  - 6" x 6" molded 45° lateral wye: centre (where the branch meets the run) to the heel end
-//    2'-2 11/16", to the outlet end 0, to the branch end 2'-3 3/8".
-//  - 6" cleanout (typical CO1): the top point to the face the pipe fuses to, 15 1/8".
+//    2'-2 11/16", to the outlet end 7 3/4", to the branch end 2'-3 3/8" (34 7/16" overall, the
+//    Integrifuse wye's catalog length). Sheet 10WWD -3 settles the outlet: two wyes, and the long
+//    run comes out at exactly one 40' stick.
+//  - 6" cleanout (typical CO1): the top point to the face the pipe fuses to, 7 3/8".
 //  - 6" x 4" concentric reducer: 9 1/4" end to end.
 // A floor-drain hub end (BU … TYPE A) takes nothing: the pipe runs to the printed point.
 const SHEETS = 'From the B&V HDPE isometrics (matches their BOMs)';
@@ -144,8 +147,8 @@ function makerFitting(brand: Brand, type: FittingType, size: number, material: M
 }
 
 function sheetFitting(type: FittingType, size: number, material: Material, size2?: number | null): TakeoutEntry | null {
-  if (type === 'lateral' && size === 6) return {id: 'bv-lateral-6', type, size, material, takeout: 26.6875, outlet: 0, branch: 27.375, note: SHEETS};
-  if (type === 'cleanout' && size === 6) return {id: 'bv-cleanout-6', type, size, material, takeout: null, laying: 15.125, note: SHEETS};
+  if (type === 'lateral' && size === 6) return {id: 'bv-lateral-6', type, size, material, takeout: 26.6875, outlet: 7.75, branch: 27.375, note: SHEETS};
+  if (type === 'cleanout' && size === 6) return {id: 'bv-cleanout-6', type, size, material, takeout: null, laying: 7.375, note: SHEETS};
   if (type === 'reducer' && size === 6 && size2 === 4) return {id: 'bv-reducer-6x4', type, size, size2: 4, material, takeout: null, laying: 9.25, note: SHEETS};
   return null;
 }

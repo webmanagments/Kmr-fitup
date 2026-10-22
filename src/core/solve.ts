@@ -141,6 +141,14 @@ export function parseDirection(raw: string | null | undefined): Vec | null {
   const s = raw.toUpperCase().replace(/NORTH/g, 'N').replace(/SOUTH/g, 'S').replace(/EAST/g, 'E').replace(/WEST/g, 'W').replace(/[-_]/g, ' ').trim();
   if (/^(UP|U|RISE|VERTICAL UP)\b/.test(s)) return v(0, 0, 1);
   if (/^(DOWN|D|DROP|VERTICAL DOWN)\b/.test(s)) return v(0, 0, -1);
+  // "E 45 S" (from East, 45° toward South) is the same as "S 45 E".
+  const bearingEW = /^([EW])\s*(\d+(?:\.\d+)?)\s*°?\s*([NS])/.exec(s);
+  if (bearingEW) {
+    const a = (parseFloat(bearingEW[2]) * Math.PI) / 180;
+    const ew = bearingEW[1] === 'E' ? 1 : -1;
+    const ns = bearingEW[3] === 'N' ? 1 : -1;
+    return v(Math.cos(a) * ew, Math.sin(a) * ns, 0);
+  }
   const bearing = /^([NS])\s*(\d+(?:\.\d+)?)\s*°?\s*([EW])/.exec(s);
   if (bearing) {
     const a = (parseFloat(bearing[2]) * Math.PI) / 180;
@@ -273,10 +281,21 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
     // outlet short. Tell them apart from the geometry.
     const centre = f.point ? pos.get(f.point) : undefined;
     const farEnd = (l: Leg) => pos.get(l.from === f.point ? l.to : l.from);
-    const branchLeg = f.branchLeg ? legById.get(f.branchLeg) : undefined;
+    // Tees and wyes read without a branch leg: the branch is the leg that isn't in line with another.
+    let branchId = f.branchLeg ?? null;
+    if (!branchId && (f.type === 'lateral' || f.type === 'tee') && centre && legsHere.length === 3) {
+      const dirs = legsHere.map(l => (farEnd(l) ? norm(sub(farEnd(l)!, centre)) : null));
+      for (let i = 0; i < 3 && !branchId; i++) {
+        const [j, k] = [0, 1, 2].filter(x => x !== i);
+        const a = dirs[j];
+        const b = dirs[k];
+        if (a && b && a.x * b.x + a.y * b.y + a.z * b.z < -0.95) branchId = legsHere[i].id;
+      }
+    }
+    const branchLeg = branchId ? legById.get(branchId) : undefined;
     const branchDir = centre && branchLeg && farEnd(branchLeg) ? norm(sub(farEnd(branchLeg)!, centre)) : null;
     for (const l of legsHere) {
-      const branch = !!f.branchLeg && f.branchLeg === l.id;
+      const branch = !!branchId && branchId === l.id;
       let role: Port['role'] = branch ? 'branch' : 'takeout';
       if (!branch && f.type === 'lateral' && branchDir && centre && farEnd(l)) {
         const d = norm(sub(farEnd(l)!, centre));

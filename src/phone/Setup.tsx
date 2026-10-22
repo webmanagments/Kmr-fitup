@@ -130,7 +130,7 @@ export function LibraryCard() {
   return (
     <div className="card">
       <h3>Fitting sizes (centre to end)</h3>
-      <p className="muted small">How far each fitting reaches from its centre (where the centrelines cross) to the face the pipe fuses to. The app adds up the fittings at both ends of a pipe to get that pipe's take-out, and subtracts it from the centre-to-centre length. Used when the drawing doesn't print one. Without an entry here, HDPE 90s, 45s and tees use the GF Central Plastics molded DR11 catalog (6": 90 = 8 5/8", 45 = 8 1/2", tee = 9"; 4": 90 = 6 3/8", 45 = 6 1/4"); the 6" lateral wye (heel 2'-2 11/16", outlet 0", branch 2'-3 3/8"), the 6" cleanout (15 1/8") and the 6" x 4" reducer (9 1/4") come from your B&V sheets; steel uses ASME B16.9 long-radius.</p>
+      <p className="muted small">How far each fitting reaches from its centre (where the centrelines cross) to the face the pipe fuses to. The app adds up the fittings at both ends of a pipe to get that pipe's take-out, and subtracts it from the centre-to-centre length. Used when the drawing doesn't print one. Without an entry here, HDPE fittings use the maker picked above (Integrity Fusion 6": 90 = 8 13/16", 45 = 6 7/16"; GF Central Plastics 6": 90 = 8 5/8", 45 = 8 1/2"). The 6" lateral wye (heel 2'-2 11/16", outlet 7 3/4", branch 2'-3 3/8"), the 6" cleanout (7 3/8") and the 6" x 4" reducer (9 1/4") come from your B&V sheets. Steel uses ASME B16.9 long-radius.</p>
       {p.library.length ? (
         <table className="results lib">
           <tbody>
@@ -218,7 +218,7 @@ export function LibraryCard() {
         {type === 'lateral' && (
           <label>
             Outlet centre to end
-            <LenInput value={out} onChange={setOut} placeholder={`e.g. 0"`} allowEmpty />
+            <LenInput value={out} onChange={setOut} placeholder={`e.g. 7 3/4"`} allowEmpty />
           </label>
         )}
         {(type === 'tee' || type === 'lateral') && (

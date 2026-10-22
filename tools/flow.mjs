@@ -79,9 +79,9 @@ try {
   await key('ArrowUp', 3);
   check('Up reaches the first sheet', (await focused()).startsWith('job-demo0'));
   await key('ArrowDown', 3);
-  check('Down past the last card turns the page', (await g.locator('.job-card').count()) === 3 && (await g.textContent('.pager b')) === '2/2');
+  check('Down past the last card turns the page', (await g.locator('.job-card').count()) === 3 && (await g.textContent('.pager b')) === '2/3');
   await key('ArrowUp');
-  check('Up from the first card on page 2 goes back', (await g.textContent('.pager b')) === '1/2' && (await focused()).startsWith('job-demo2'));
+  check('Up from the first card on page 2 goes back', (await g.textContent('.pager b')) === '1/3' && (await focused()).startsWith('job-demo2'));
 
   // Open ISO-6
   await key('Enter', 1, 600);
@@ -179,8 +179,8 @@ try {
   await key('ArrowRight', 2, 400);
   await shot('13-wye');
   await key('Escape', 1, 600);
-  check('Coming back from a page-2 sheet lands on page 2', (await g.textContent('.pager b')) === '2/2' && (await focused()).startsWith('job-demo3'), await focused());
-  await key('ArrowDown', 2);
+  check('Coming back from a page-2 sheet lands on page 2', (await g.textContent('.pager b')) === '2/3' && (await focused()).startsWith('job-demo3'), await focused());
+  await key('ArrowDown', 3);
   await key('Enter', 1, 600);
   await key('ArrowUp');
   await key('ArrowRight');
@@ -191,10 +191,10 @@ try {
 
   // Pair screen
   await key('ArrowLeft');
-  check('Left on a card flips back a page', (await g.textContent('.pager b')) === '1/2');
+  check('Left on a card flips back a page', (await g.textContent('.pager b')) === '2/3');
   await key('ArrowRight');
-  check('Right on a card flips forward', (await g.textContent('.pager b')) === '2/2');
-  await key('ArrowDown', 3);
+  check('Right on a card flips forward', (await g.textContent('.pager b')) === '3/3');
+  await key('ArrowDown');
   check('Down from the last page reaches the buttons', ['pair', 'samples', 'calc', 'settings'].includes(await focused()), await focused());
   await key('ArrowLeft', 3);
   check('Pair button', (await focused()) === 'pair');
@@ -251,7 +251,7 @@ try {
   await ph.click('.samples .btn:text-is("ISO-3")');
   await ph.waitForTimeout(400);
   const pcuts = await ph.locator('.results .cut').allTextContents();
-  check('Phone shows the -3 cut list', pcuts.includes(`19'-9 5/16"`), pcuts.join(', '));
+  check('Phone shows the -3 cut list', pcuts.includes(`19'-1 9/16"`), pcuts.join(', '));
   shots && (await ph.screenshot({path: `${shots}/p-02-review.png`, fullPage: true}));
   // Edit: rename and send
   await ph.fill('.title-input', 'DEMO-ISO-77');

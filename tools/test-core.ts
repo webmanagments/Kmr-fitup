@@ -1,7 +1,7 @@
 // node --experimental-strip-types tools/test-core.ts
 import assert from 'node:assert/strict';
 import {DEFAULT_SETTINGS, lookup, type TakeoutEntry} from '../src/core/library.ts';
-import {EXAMPLE, SHEET_11, SHEET_13, SHEET_2, SHEET_3, SHEET_6} from '../src/core/samples.ts';
+import {EXAMPLE, SHEET_11, SHEET_13, SHEET_2, SHEET_3, SHEET_3B, SHEET_6} from '../src/core/samples.ts';
 import {parseDirection, solve} from '../src/core/solve.ts';
 import {formatLength, parseLength, parseSize} from '../src/core/units.ts';
 import {makerFits, makerLine} from '../src/core/makers.ts';
@@ -77,14 +77,14 @@ t('steel falls back to ASME B16.9 take-outs', () => {
   assert.equal(formatLength(r.pieces[1].cut), `48'-6"`); // 600 - 9 - 9
 });
 
-t('sheet -3: lateral wye, pipe 19\'-9 5/16" matches the print, BOM flagged', () => {
+t('sheet -3: one lateral wye, pipe 19\'-1 9/16" = the BOM (19\'-9 5/16" is wye centre to end)', () => {
   const r = solve(SHEET_3, GF);
   const pipe = r.pieces.filter(p => p.status === 'ok');
   assert.equal(pipe.length, 1);
-  assert.equal(formatLength(pipe[0].cut), `19'-9 5/16"`);
-  assert.equal(pipe[0].printedMatch, true);
+  assert.equal(formatLength(pipe[0].cut), `19'-1 9/16"`);
+  assert.equal(pipe[0].takeout, 7.75); // the wye's outlet end
   assert.deepEqual(pipe[0].welds, ['1147']);
-  assert.ok(r.checks.some(c => c.level === 'warn' && /BOM 19'-1 9\/16"/.test(c.text) && /7 3\/4"/.test(c.text)));
+  assert.ok(r.checks.some(c => c.level === 'ok' && /matches the BOM \(19'-1 9\/16"\)/.test(c.text)), JSON.stringify(r.checks));
   assert.ok(r.ready);
   const w = r.points.find(p => p.id === 'W')!.pos!;
   assert.ok(Math.abs(w.x / 12 - 1085.86) < 0.01);
@@ -130,8 +130,8 @@ t('HDPE catalog covers 2"-12" 90s, 45s and tees', () => {
   assert.equal(lk('tee', 6)!.takeout, 9);
   assert.equal(lk('tee', 6)!.branch, 9);
   assert.equal(lk('elbow90', 12)!.takeout, 15.25);
-  assert.deepEqual([lk('lateral', 6)!.takeout, lk('lateral', 6)!.outlet, lk('lateral', 6)!.branch], [26.6875, 0, 27.375]);
-  assert.equal(lk('cleanout', 6)!.laying, 15.125);
+  assert.deepEqual([lk('lateral', 6)!.takeout, lk('lateral', 6)!.outlet, lk('lateral', 6)!.branch], [26.6875, 7.75, 27.375]);
+  assert.equal(lk('cleanout', 6)!.laying, 7.375);
   assert.equal(lookup([], 'reducer', 6, 'hdpe', 4)!.entry.laying, 9.25);
   assert.equal(lookup([], 'reducer', 6, 'hdpe', 3)!.entry.other, 'Integrifuse'); // no GF size: the other maker's, flagged
   assert.equal(lookup([{id: 'x', type: 'elbow90', size: 6, material: 'hdpe', takeout: 9}], 'elbow90', 6, 'hdpe')!.source, 'library');
@@ -140,11 +140,11 @@ t('sheet -13: cleanout riser, rolled 45s and lateral add up to the BOM (25\'-3 5
   const r = solve(SHEET_13, GF);
   assert.ok(r.ready, JSON.stringify(r.checks));
   const cut = r.pieces.filter(p => p.status === 'ok').map(p => formatLength(p.cut));
-  assert.deepEqual(cut, [`2'-0"`, `23'-3 5/16"`]);
+  assert.deepEqual(cut, [`2'-7 3/4"`, `22'-7 9/16"`]);
   assert.deepEqual(r.pieces.map(p => p.status), ['ok', 'nopipe', 'nopipe', 'ok', 'nopipe']);
   assert.ok(r.checks.some(c => c.level === 'ok' && /matches the BOM \(25'-3 5\/16"\)/.test(c.text)));
   const wye = r.fittings.find(f => f.fitting.type === 'lateral')!;
-  assert.deepEqual(wye.ports.map(p => [p.role, p.takeout]), [['takeout', 26.6875], ['outlet', 0], ['branch', 27.375]]);
+  assert.deepEqual(wye.ports.map(p => [p.role, p.takeout]), [['takeout', 26.6875], ['outlet', 7.75], ['branch', 27.375]]);
   const w = Object.fromEntries(r.welds.map(x => [x.number, x.joins]));
   assert.match(w['1472'], /45° elbow.*↔.*45° elbow/);
   assert.match(w['1471'], /45° elbow.*↔.*lateral wye/);
@@ -161,6 +161,25 @@ t('sheet -11 (4"): 90, 45 and a 6x4 reducer add up to the BOM (24\'-2")', () => 
   assert.ok(r.checks.some(c => c.level === 'ok' && /matches the BOM \(24'-2"\)/.test(c.text)));
   assert.equal(r.fittings.find(f => f.fitting.type === 'reducer')!.name, '6" x 4" Reducer (item 2)');
   assert.equal(r.size, 4);
+});
+t('sheet 10WWD -3: two wyes and a mid-run joint; the long pipe is exactly one 40\' stick', () => {
+  for (const settings of [GF, DEFAULT_SETTINGS]) {
+    const r = solve(SHEET_3B, settings);
+    assert.ok(r.ready, JSON.stringify(r.checks));
+    assert.deepEqual(r.pieces.filter(p => p.status === 'ok').map(p => formatLength(p.cut)), [`16'-2 7/8"`, `40'-0"`, `6'-6 3/16"`]);
+    assert.ok(r.checks.some(c => c.level === 'ok' && /matches the BOM \(62'-9 1\/16"\)/.test(c.text)));
+    const w = Object.fromEntries(r.welds.map(x => [x.number, x.joins]));
+    assert.match(w['1615'], /Pipe P2 ↔ Joint|Pipe P3 ↔ Joint/);
+    assert.match(w['1617'], /Pipe P2 ↔ 6" 45° lateral wye/);
+    assert.match(w['1618'], /Pipe P1 ↔ 6" 45° lateral wye/);
+  }
+  // "E 45 S" reads the same as "S 45 E"
+  const d = parseDirection('E 45 S 0.21 Up')!;
+  assert.ok(Math.abs(d.x - Math.SQRT1_2) < 1e-9 && Math.abs(d.y + Math.SQRT1_2) < 1e-9);
+  // A reading that forgot which leg is the branch still works out the wye's ends.
+  const s = structuredClone(SHEET_3B);
+  for (const f of s.fittings) f.branchLeg = null;
+  assert.deepEqual(solve(s, GF).pieces.filter(p => p.status === 'ok').map(p => formatLength(p.cut)), [`16'-2 7/8"`, `40'-0"`, `6'-6 3/16"`]);
 });
 t('sheet -2: geometry from elevations and the wye branch', () => {
   const r = solve(SHEET_2, GF);
@@ -229,8 +248,8 @@ t('fitting makers: Integrifuse sizes, fallbacks and which maker a sheet was draw
   assert.equal(lk('tee', 4)!.branch, 7);
   assert.equal(lk('reducer', 6, 4)!.laying, 11.4375); // 11.42
   assert.equal(lk('cap', 6)!.takeout, 7.0625); // 7.08
-  const wye = lk('lateral', 6)!; // item 100906: A 33.74, B 6.18, C 25.54
-  assert.deepEqual([wye.takeout, wye.outlet, wye.branch], [27.5625, 6.1875, 25.5625]);
+  const wye = lk('lateral', 6)!; // item 100906: the drawings' figures (34 7/16" overall = Integrifuse's catalog length)
+  assert.deepEqual([wye.takeout, wye.outlet, wye.branch], [26.6875, 7.75, 27.375]);
   assert.equal(lk('elbow90', 10)!.other, 'GF Central Plastics'); // Integrifuse doesn't list 10": GF, flagged
   assert.equal(lk('cleanout', 6)!.note, 'From the B&V HDPE isometrics (matches their BOMs)'); // no maker figure: the drawings'
   // Sheet -6 with Integrifuse fittings: P1 = 5'-7 3/16" − 8 13/16", P2 = 22'-11 1/4" − 8 13/16" − 6 7/16",

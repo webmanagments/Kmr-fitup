@@ -149,19 +149,24 @@ MODEL THE PIPE AS POINTS AND LEGS
 - A boxed group "3 / EL+ 3353.03 / 45°" tags the fitting at that point: BOM item 3, centre elevation 3353.03, a 45° fitting. "2 / EL+ 3352.01" is item 2 (look the item up in the BOM to know the fitting type).
 - Lateral wye: its point is where the branch centreline meets the run. Make one leg to each run side and one leg up the branch; set branchLeg.
 - Concentric reducer at a sheet break or between pipes: in-line fitting on that leg (inlineLeg/inlineAt), size "6\" x 4\"" (big end first).
-- Directions: give each leg's direction of travel from→to in plant axes: N, S, E, W, NE, Up, Down, a bearing like "S45W"/"N45E", or a rolled leg like "W 45 Down". Use printed coordinates first, then direction labels on the drawing ("N 45 E 0.29 Up" means that leg runs N45E, rising 0.29 ft), then the north arrow (usually top-left). Vertical risers and drops are Up / Down.
+- A field joint in the middle of a straight run (two pipes fused end to end: an X with a weld number and an "FW" box but no fitting, often where a 40' stick runs out): make a point there (kind "center", label "Joint", no fitting) and split the run into two legs at it, each with its own dimension. Record the joint at that point.
+- Directions: give EVERY leg a direction of travel from→to in plant axes: N, S, E, W, NE, Up, Down, a bearing like "S45W"/"N45E", or a rolled leg like "W 45 Down". Use printed coordinates first (compare the E and N of points on the same run), then direction labels on the drawing ("N 45 E 0.29 Up" or "E 45 S 0.21 Up" mean that branch runs at 45° between those two directions, rising a little; copy them as printed), then the north arrow (usually top-left). Vertical risers and drops are Up / Down.
 
 WHICH DIMENSION GOES WHERE
 - "cc" is a printed dimension spanning exactly that leg, point to point. Several parallel dimension lines are common: the one nearest the pipe usually spans the shortest stretch (e.g. "23'-3 5/16"" wye to end), the outer one spans more (e.g. "26'-2 1/2"" 45 to end, which is 23'-3 5/16" + 2'-11 3/16"). Give each leg the one that spans exactly it; put overall dimensions in drawing.notes.
 - A rolled or sloped leg can show its parts: a vertical part ("1'-0 1/16"), a horizontal part ("11 15/16"") and the true length along the pipe ("1'-5""). The true length is the cc; the parts go in notes. Two equal parts (two "10 15/16"") belong to a 45° leg whose true length is printed separately ("1'-3 1/2"").
 - A riser's vertical dimension (e.g. "3'-11 5/8"" from a cleanout top down to the 45, or "6'-0 7/8"" from a floor drain down to the 90) is the cc of that riser leg.
 - A dimension along a lateral's branch from the wye point to the branch end ("2'-3 3/8"") is the cc of the branch leg.
-- Only use takeout / branchTakeout / takeouts / laying when the sheet explicitly dimensions a fitting body (centre to end, end to end). Never invent them.
+- Only use takeout / branchTakeout / takeouts / laying when the sheet explicitly dimensions a fitting body (centre to end, end to end). Never invent them. Fitting sizes are NOT normally printed on these sheets: the app has the makers' sizes, so a missing fitting size is never "unreadable".
 
 WELDS
 - Joint numbers are usually handwritten in red circles with a leader line to an X on the pipe. Boxes "13WWD-FW" mark field welds (type "FW"). Follow each leader to its X.
 - Record each joint at the point it is next to, and set "leg" to the leg it sits on (at a fitting with several legs). Where two fittings fuse straight together the X is between them on that short leg: use that leg.
 - A joint at a "Cont on" end belongs to that end point.
+- An "FW" box with no handwritten number next to it is normal (that joint is numbered on the next sheet): just leave it out. Faint numbers showing through from the sheet underneath are not on this sheet: ignore them, don't mention them.
+
+UNREADABLE
+- "unreadable" is only for things printed on THIS sheet that you could not make out (a blurred digit, a cut-off label). Not for things that aren't printed, not for drafting conventions, not for show-through, not for fitting sizes.
 
 BILL OF MATERIALS
 - Copy every row: item, size 1, size 2, description, qty exactly. The pipe quantity is a total length (25'-3 5/16"). Pipe size can differ from fitting sizes (4" pipe with a 6" x 4" reducer): give each fitting its own size.

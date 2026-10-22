@@ -7,6 +7,7 @@ import {SAMPLES} from '../core/samples.ts';
 import type {Sheet} from '../core/types.ts';
 import {forClaude, forGlasses, loadPhoto, type Photo} from './image.ts';
 import {getPrefs, setPrefs, usePrefs} from './prefs.ts';
+import LiveScan from './LiveScan.tsx';
 import Review from './Review.tsx';
 import {KeyCard, LibraryCard, ShopCard} from './Setup.tsx';
 
@@ -20,6 +21,7 @@ export default function App() {
   const [busy, setBusy] = useState<Busy>(null);
   const [msg, setMsg] = useState<{kind: 'ok' | 'err' | 'info'; text: string} | null>(null);
   const [seconds, setSeconds] = useState(0);
+  const [live, setLive] = useState<null | {closeUp: boolean; target?: string}>(null);
   const abort = useRef<AbortController | null>(null);
   const camera = useRef<HTMLInputElement>(null);
   const gallery = useRef<HTMLInputElement>(null);
@@ -46,7 +48,7 @@ export default function App() {
     setPhotos(ps => [...ps, ...loaded].slice(0, 4));
   };
 
-  const read = async () => {
+  const read = async (list: Photo[] = photos, extra = '') => {
     if (!p.apiKey) {
       setTab('setup');
       setMsg({kind: 'err', text: 'Add your Anthropic API key first.'});
@@ -58,12 +60,18 @@ export default function App() {
     abort.current = ctl;
     try {
       const images = [];
-      for (const ph of photos) images.push(await forClaude(ph));
-      const r = await readSheet(p.apiKey, images, p.model, p.note, ctl.signal);
+      for (const ph of list) images.push(await forClaude(ph));
+      const r = await readSheet(p.apiKey, images, p.model, [p.note, extra].filter(Boolean).join('\n'), ctl.signal);
       const sp = getPrefs().spent;
       setPrefs({spent: {input: sp.input + r.usage.input, output: sp.output + r.usage.output, reads: sp.reads + 1}});
       setSheet(r.sheet);
-      setMsg({kind: 'info', text: `Read ${shortName(r.sheet.drawing.number)}. Check the numbers below, then send it to your glasses.`});
+      const missed = r.sheet.unreadable?.length ?? 0;
+      setMsg({
+        kind: 'info',
+        text: missed
+          ? `Read ${shortName(r.sheet.drawing.number)}, but ${missed} thing${missed > 1 ? 's were' : ' was'} hard to read. A close-up will fix it (see below).`
+          : `Read ${shortName(r.sheet.drawing.number)}. Check the numbers below, then send it to your glasses.`,
+      });
     } catch (e) {
       if ((e as Error).name === 'AbortError') setMsg({kind: 'info', text: 'Stopped.'});
       else setMsg({kind: 'err', text: e instanceof ReadError ? e.message : `Something went wrong: ${(e as Error).message}`});
@@ -71,6 +79,19 @@ export default function App() {
       setBusy(null);
       abort.current = null;
     }
+  };
+
+  const gotLivePhoto = (photo: Photo) => {
+    const closeUp = live?.closeUp ?? false;
+    setLive(null);
+    const list = (closeUp ? [...photos, photo] : [photo, ...photos]).slice(0, 4);
+    setPhotos(list);
+    if (!getPrefs().apiKey) {
+      setMsg({kind: 'info', text: 'Got the photo. Add your Anthropic API key in Setup to read it.'});
+      return;
+    }
+    const missed = sheet?.unreadable ?? [];
+    void read(list, closeUp && missed.length ? `On the first read you couldn't make out: ${missed.join('; ')}. The last photo is a close-up taken to show exactly that. Read the whole sheet again using every photo.` : '');
   };
 
   const send = async () => {
@@ -129,6 +150,8 @@ export default function App() {
         </nav>
       </header>
 
+      {live && <LiveScan title={live.closeUp ? 'Close-up' : 'Whole sheet'} target={live.closeUp ? live.target : 'Fit the whole sheet in the frame'} closeUp={live.closeUp} onPhoto={gotLivePhoto} onClose={() => setLive(null)} />}
+
       {tab === 'setup' && (
         <>
           <PairCard />
@@ -172,8 +195,11 @@ export default function App() {
                   </div>
                 ))}
               </div>
+              <button className="btn primary wide live-btn" onClick={() => setLive({closeUp: false})} disabled={photos.length >= 4 || busy === 'reading'}>
+                Live scan <small>takes the photo and reads it by itself</small>
+              </button>
               <div className="row">
-                <button className="btn primary" onClick={() => camera.current?.click()} disabled={photos.length >= 4}>
+                <button className="btn" onClick={() => camera.current?.click()} disabled={photos.length >= 4}>
                   Take photo
                 </button>
                 <button className="btn" onClick={() => gallery.current?.click()} disabled={photos.length >= 4}>
@@ -226,6 +252,33 @@ export default function App() {
           )}
 
           {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
+
+          {sheet && busy === 'reading' && (
+            <div className="card reading">
+              <span className="spin" aria-hidden="true" />
+              <span>
+                Reading again with the close-up… {seconds}s<small>usually 20–60 seconds</small>
+              </span>
+              <button className="btn" onClick={() => abort.current?.abort()}>
+                Stop
+              </button>
+            </div>
+          )}
+
+          {sheet && busy !== 'reading' && !!sheet.unreadable?.length && photos.length > 0 && photos.length < 4 && (
+            <div className="card improve">
+              <h3>Claude couldn't read {sheet.unreadable.length === 1 ? 'one thing' : `${sheet.unreadable.length} things`}</h3>
+              <ul>
+                {sheet.unreadable.map((u, i) => (
+                  <li key={i}>{u}</li>
+                ))}
+              </ul>
+              <button className="btn primary wide" onClick={() => setLive({closeUp: true, target: sheet.unreadable!.slice(0, 2).join(' · ')})}>
+                Live close-up (auto)
+              </button>
+              <p className="muted small">Point at that part of the sheet. It snaps when it's sharp and reads the whole sheet again with both photos (this replaces any edits below).</p>
+            </div>
+          )}
 
           {sheet && (
             <>

@@ -11,7 +11,10 @@ take-outs and a weld map you can tick off as you go.
 
 1. Open FitUp on the glasses. The home screen shows an 8-character pairing code.
 2. On the phone, open the scanner, enter the code and your Anthropic API key (Setup).
-3. Take a photo of the sheet (plus close-ups of small numbers if you like) and tap **Read it with Claude**.
+3. Tap **Live scan** and point the phone at the sheet. The phone checks every frame itself (steady,
+   sharp, lit, sheet filling the view) and takes the picture the moment it's good, then Claude
+   reads it. If Claude can't read something, tap **Live close-up**: it snaps a close-up the same
+   way and reads the sheet again with both photos. (Take photo / Choose photos still work.)
 4. Check what was read. Every number can be fixed, and the cut list updates as you type.
 5. **Send to glasses.** The sheet is encrypted with the pairing code and lands on the glasses in a few seconds.
 

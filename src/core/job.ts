@@ -10,6 +10,7 @@ export interface Job {
   settings: Settings;
   library: TakeoutEntry[];
   thumb?: string | null; // small greyscale JPEG of the drawing (data URL)
+  thumbs?: string[]; // every photo of the sheet, same format (thumb is the first)
   demo?: boolean;
 }
 

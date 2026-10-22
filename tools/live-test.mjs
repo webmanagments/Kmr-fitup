@@ -1,5 +1,6 @@
 // Dev-only: live scan end to end with a fake camera feed (an .mjpeg of a sheet photo) and a fake
-// Claude. Usage: node tools/live-test.mjs feed.mjpeg [shotsDir]
+// Claude, then several gallery photos read as one sheet.
+// Usage: node tools/live-test.mjs feed.mjpeg shotsDir photo1.jpg photo2.jpg photo3.jpg …
 import {spawn} from 'node:child_process';
 import {chromium} from 'playwright';
 
@@ -24,6 +25,7 @@ try {
     const body = JSON.parse(route.request().postData());
     calls.push(body);
     const imgs = body.messages[0].content.filter(c => c.type === 'image').length;
+    const second = JSON.stringify(body).includes('First reading:');
     const sheet = {
       drawing: {number: 'DEMO-ISO-6'},
       size: '6"',
@@ -37,16 +39,17 @@ try {
       ],
       legs: [
         {id: 'L1', from: 'T', to: 'E1', direction: 'Down'},
-        {id: 'L2', from: 'E1', to: 'E2', direction: 'S', cc: `22'-11 1/4"`},
+        {id: 'L2', from: 'E1', to: 'E2', direction: 'S', cc: imgs >= 3 && !second ? `23'-11 1/4"` : `22'-11 1/4"`},
         {id: 'L3', from: 'E2', to: 'B', direction: 'S45E', cc: '8 1/2"'},
       ],
       fittings: [
         {id: 'F1', type: 'elbow90', point: 'E1'},
         {id: 'F2', type: 'elbow45', point: 'E2'},
       ],
-      welds: [],
+      welds: [{number: '1157', point: 'E1', leg: 'L1'}],
       bom: [{item: 1, description: 'PIPE', qty: `26'-4 11/16"`}],
       unreadable: imgs < 2 ? ['the bill of materials quantities'] : [],
+      // (3+ photos: the first reading misreads a digit; the double-check gets it right)
       confidence: imgs < 2 ? 'medium' : 'high',
     };
     await route.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify({model: body.model, stop_reason: 'tool_use', usage: {input_tokens: 4000, output_tokens: 1500}, content: [{type: 'tool_use', id: 't1', name: 'record_isometric', input: sheet}]})});
@@ -77,6 +80,24 @@ try {
   const cuts = await ph.locator('.results .cut').allTextContents();
   check('Cut list shows', cuts.includes(`4'-10 9/16"`), cuts.join(', '));
   shots && (await ph.screenshot({path: `${shots}/live-4.png`}));
+
+  // Several photos of one sheet, picked from the gallery: read as one, double-checked.
+  await ph.click('text=New sheet');
+  const parts = process.argv.slice(4);
+  await ph.setInputFiles('input[type=file][multiple]', parts);
+  await ph.waitForSelector('.photo-count');
+  check('Picked photos all kept and shown as one sheet', (await ph.textContent('.photo-count')).startsWith(`${parts.length} photos`) && (await ph.locator('.ph').count()) === parts.length);
+  const before = calls.length;
+  await ph.click('text=Read it with Claude');
+  await ph.waitForFunction(() => document.querySelectorAll('.results .cut').length > 0 && !document.querySelector('.reading'), null, {timeout: 20000});
+  const first = calls[before];
+  check('All photos go in one request, labelled', first.messages[0].content.filter(c => c.type === 'image').length === parts.length && JSON.stringify(first).includes(`Photo ${parts.length} of ${parts.length}`));
+  check('A reading that does not add up gets a second look', calls.length === before + 2 && JSON.stringify(calls[before + 1]).includes('First reading:') && JSON.stringify(calls[before + 1]).includes('BOM'));
+  const m = await ph.textContent('.msg');
+  check('The fixed reading is used', /Double-checked: fixed/.test(m) && /Everything adds up/.test(m), m);
+  const total = first.messages[0].content.filter(c => c.type === 'image').reduce((n, c) => n + c.source.data.length, 0);
+  check('Request stays well under the size limit', total < 21_000_000, `${(total / 1e6).toFixed(1)} MB`);
+  shots && (await ph.screenshot({path: `${shots}/live-5.png`}));
 } catch (e) {
   check('Ran to the end', false, e.message);
 } finally {

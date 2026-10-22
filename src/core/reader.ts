@@ -1,7 +1,9 @@
 // Reads an isometric photo with Claude (vision), straight from the phone with the user's own key.
 // The model fills in a fixed structure (a forced tool call), copying numbers exactly as printed.
 // The app does every calculation itself; the model only reads.
+import type {Settings, TakeoutEntry} from './library.ts';
 import {SHEET_13} from './samples.ts';
+import {solve} from './solve.ts';
 import type {Fitting, Joining, Leg, Point, Sheet, Weld, BomItem, FittingType} from './types.ts';
 
 export const MODELS = [
@@ -178,10 +180,22 @@ export interface ImageIn {
   data: string; // base64, no data: prefix
 }
 
-export function buildRequest(images: ImageIn[], model = DEFAULT_MODEL, hint = '') {
-  const content: unknown[] = images.map(im => ({type: 'image', source: {type: 'base64', media_type: im.mediaType, data: im.data}}));
-  const many = images.length > 1 ? `These ${images.length} photos are all of ONE sheet: some may show the whole sheet, others parts of it or close-ups. Combine them. ` : '';
-  content.push({type: 'text', text: `${many}Read this isometric and record it.${hint ? `\nNotes from the fitter (follow them): ${hint}` : ''}`});
+function photoBlocks(images: ImageIn[]): unknown[] {
+  const n = images.length;
+  return images.flatMap((im, i) => [
+    ...(n > 1 ? [{type: 'text', text: `Photo ${i + 1} of ${n} (all of the same sheet)`}] : []),
+    {type: 'image', source: {type: 'base64', media_type: im.mediaType, data: im.data}},
+  ]);
+}
+
+const ONE_SHEET = (n: number) =>
+  n > 1
+    ? `These ${n} photos are all of ONE sheet, taken in parts: the drawing area, the title block, the bill of materials, close-ups. Put them together into ONE complete reading of the whole sheet: every point, leg, fitting, joint number and BOM row from every photo, each once. `
+    : '';
+
+export function buildRequest(images: ImageIn[], model = DEFAULT_MODEL, hint = '', extra?: string) {
+  const content: unknown[] = photoBlocks(images);
+  content.push({type: 'text', text: `${ONE_SHEET(images.length)}Read this isometric and record it.${hint ? `\nNotes from the fitter (follow them): ${hint}` : ''}${extra ? `\n\n${extra}` : ''}`});
   return {
     model,
     max_tokens: 32000,
@@ -208,7 +222,7 @@ export interface ReadResult {
 }
 
 /** Call the API from the browser with the user's own key. */
-export async function readSheet(apiKey: string, images: ImageIn[], model = DEFAULT_MODEL, hint = '', signal?: AbortSignal): Promise<ReadResult> {
+export async function readSheet(apiKey: string, images: ImageIn[], model = DEFAULT_MODEL, hint = '', signal?: AbortSignal, extra?: string): Promise<ReadResult> {
   let r: Response;
   try {
     r = await fetch(API_URL, {
@@ -220,7 +234,7 @@ export async function readSheet(apiKey: string, images: ImageIn[], model = DEFAU
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
       },
-      body: JSON.stringify(buildRequest(images, model, hint)),
+      body: JSON.stringify(buildRequest(images, model, hint, extra)),
     });
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
@@ -246,6 +260,38 @@ export async function readSheet(apiKey: string, images: ImageIn[], model = DEFAU
     throw new ReadError('refused', said ? `Claude didn't return a reading: ${String(said).slice(0, 300)}` : "Claude didn't return a reading. Try again.");
   }
   return {sheet: normalizeSheet(input), usage: {input: body.usage?.input_tokens ?? 0, output: body.usage?.output_tokens ?? 0}, model: body.model ?? model};
+}
+
+/**
+ * What looks wrong with a reading, judged by solving it: things that don't add up point at a
+ * misread number, a missed fitting or a missed photo. Missing fitting sizes are not reading
+ * problems (they come from the fitter's library), so they're left out.
+ */
+export function readingProblems(sheet: Sheet, settings?: Settings, library: TakeoutEntry[] = []): string[] {
+  const sol = solve(sheet, settings, library);
+  const out: string[] = [];
+  for (const c of sol.checks) {
+    if (c.level !== 'error' && c.level !== 'warn') continue;
+    if (/^Need the |Fusion allowance|longer than a .* stick|^Couldn't read/.test(c.text)) continue;
+    out.push(c.text);
+  }
+  for (const p of sol.pieces)
+    if (p.cc === null) out.push(`Run ${p.leg} (${p.from} → ${p.to}) has no length: no dimension for it, and its ends can't be placed from coordinates and directions.`);
+  if (!sheet.bom.length) out.push('No bill of materials was read.');
+  if (!sheet.welds.length) out.push('No joint numbers were read.');
+  if (sheet.legs.length === 0) out.push('No pipe runs were read.');
+  return out;
+}
+
+/** A second look: the same photos, the first reading, and what didn't add up. */
+export function checkPrompt(first: Sheet, problems: string[]): string {
+  return `A first reading of these photos is below. A calculator worked out the cuts from it and found these problems:
+${problems.map(p => `- ${p}`).join('\n')}
+
+Look at every photo again carefully. Fix whatever was misread or missed (a digit, a fraction, a dimension given to the wrong run, a fitting, a joint number, a BOM row, something only in one of the photos). Keep everything that was right. If the drawing itself doesn't add up (a BOM total that doesn't match its own dimensions), keep what is printed and say so in drawing.notes. Then call record_isometric with the complete corrected reading of the whole sheet.
+
+First reading:
+${JSON.stringify(first)}`;
 }
 
 /** The reading: the tool call, or (if Claude answered in text instead) a JSON object in the text. */

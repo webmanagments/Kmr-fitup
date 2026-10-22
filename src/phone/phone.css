@@ -736,3 +736,36 @@ table {
 .live-shutter:active {
   background: #fff;
 }
+.check-row {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--text);
+  font-size: 15px;
+}
+.check-row input {
+  width: 22px;
+  min-height: 22px;
+  height: 22px;
+  margin-top: 2px;
+  flex: none;
+}
+.photo-count {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--green);
+}
+.ph-num {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.75);
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

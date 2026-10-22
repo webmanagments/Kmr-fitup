@@ -2,7 +2,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {makeJob, shortName} from '../core/job.ts';
 import {CODE_LEN, formatCode, normalizeCode, sendJob} from '../core/pair.ts';
-import {readSheet, ReadError} from '../core/reader.ts';
+import {checkPrompt, readingProblems, readSheet, ReadError} from '../core/reader.ts';
 import {SAMPLES} from '../core/samples.ts';
 import type {Sheet} from '../core/types.ts';
 import {forClaude, forGlasses, loadPhoto, type Photo} from './image.ts';
@@ -11,7 +11,7 @@ import LiveScan from './LiveScan.tsx';
 import Review from './Review.tsx';
 import {KeyCard, LibraryCard, ShopCard} from './Setup.tsx';
 
-type Busy = null | 'reading' | 'sending';
+type Busy = null | 'reading' | 'checking' | 'sending';
 const MAX_PHOTOS = 8;
 
 export default function App() {
@@ -28,9 +28,10 @@ export default function App() {
   const gallery = useRef<HTMLInputElement>(null);
   const top = useRef<HTMLDivElement>(null);
   const paired = normalizeCode(p.code).length === CODE_LEN;
+  const reading = busy === 'reading' || busy === 'checking';
 
   useEffect(() => {
-    if (busy !== 'reading') return;
+    if (busy !== 'reading') return; // (the timer keeps running through the double-check)
     setSeconds(0);
     const t = setInterval(() => setSeconds(s => s + 1), 1000);
     return () => clearInterval(t);
@@ -39,7 +40,9 @@ export default function App() {
   const addFiles = async (files: FileList | null) => {
     if (!files?.length) return;
     const loaded: Photo[] = [];
-    for (const f of [...files].slice(0, MAX_PHOTOS)) {
+    const room = MAX_PHOTOS - photos.length;
+    if (files.length > room) setMsg({kind: 'err', text: `Up to ${MAX_PHOTOS} photos per sheet: kept the first ${Math.max(0, room)} of the ${files.length} you picked.`});
+    for (const f of [...files].slice(0, Math.max(0, room))) {
       try {
         loaded.push(await loadPhoto(f));
       } catch {
@@ -61,17 +64,45 @@ export default function App() {
     abort.current = ctl;
     try {
       const images = [];
-      for (const ph of list) images.push(await forClaude(ph));
-      const r = await readSheet(p.apiKey, images, p.model, [p.note, extra].filter(Boolean).join('\n'), ctl.signal);
-      const sp = getPrefs().spent;
-      setPrefs({spent: {input: sp.input + r.usage.input, output: sp.output + r.usage.output, reads: sp.reads + 1}});
-      setSheet(r.sheet);
-      const missed = r.sheet.unreadable?.length ?? 0;
+      // Keep the whole request comfortably under the API's size limit however many photos.
+      const each = Math.min(3_700_000, Math.floor(20_000_000 / Math.max(1, list.length)));
+      for (const ph of list) images.push(await forClaude(ph, each));
+      const hint = [p.note, extra].filter(Boolean).join('\n');
+      const spend = (u: {input: number; output: number}) => {
+        const sp = getPrefs().spent;
+        setPrefs({spent: {input: sp.input + u.input, output: sp.output + u.output, reads: sp.reads + 1}});
+      };
+      const r = await readSheet(p.apiKey, images, p.model, hint, ctl.signal);
+      spend(r.usage);
+      let best = r.sheet;
+      let problems = readingProblems(best, p.settings, p.library);
+      let checked = '';
+      // If the reading doesn't add up (BOM total, counts, lengths), Claude takes a second look
+      // at the same photos with the problems spelled out, and the better reading wins.
+      if (problems.length && getPrefs().autoCheck) {
+        setBusy('checking');
+        try {
+          const r2 = await readSheet(p.apiKey, images, p.model, hint, ctl.signal, checkPrompt(best, problems));
+          spend(r2.usage);
+          const p2 = readingProblems(r2.sheet, p.settings, p.library);
+          if (p2.length <= problems.length) {
+            checked = p2.length < problems.length ? ` Double-checked: fixed ${problems.length - p2.length} of ${problems.length} problem${problems.length > 1 ? 's' : ''}.` : ' Double-checked.';
+            best = r2.sheet;
+            problems = p2;
+          } else checked = ' Double-checked: the first reading was better, so it was kept.';
+        } catch (e) {
+          if ((e as Error).name === 'AbortError') throw e;
+          checked = " (The double-check didn't finish, so this is the first reading.)";
+        }
+      }
+      setSheet(best);
+      const missed = best.unreadable?.length ?? 0;
       setMsg({
-        kind: 'info',
-        text: missed
-          ? `Read ${shortName(r.sheet.drawing.number)}, but ${missed} thing${missed > 1 ? 's were' : ' was'} hard to read. A close-up will fix it (see below).`
-          : `Read ${shortName(r.sheet.drawing.number)}. Check the numbers below, then send it to your glasses.`,
+        kind: problems.length ? 'err' : 'info',
+        text:
+          `Read ${shortName(best.drawing.number)}${photos.length > 1 || list.length > 1 ? ` from ${list.length} photos` : ''}.${checked}` +
+          (problems.length ? ` Still ${problems.length} thing${problems.length > 1 ? 's' : ''} to check (see Checks below).` : ' Everything adds up.') +
+          (missed ? ` ${missed} thing${missed > 1 ? 's were' : ' was'} hard to read: a close-up will fix it.` : ''),
       });
     } catch (e) {
       if ((e as Error).name === 'AbortError') setMsg({kind: 'info', text: 'Stopped.'});
@@ -104,12 +135,18 @@ export default function App() {
     setBusy('sending');
     setMsg(null);
     try {
-      const thumb = photos[0] ? await forGlasses(photos[0]).catch(() => null) : null;
-      const job = makeJob(sheet, p.settings, p.library, thumb);
+      // Every photo goes to the glasses' drawing viewer, sharing one size budget.
+      const per = Math.min(240_000, Math.floor(300_000 / Math.max(1, photos.length)));
+      const thumbs: string[] = [];
+      for (const ph of photos) {
+        const t = await forGlasses(ph, per).catch(() => null);
+        if (t) thumbs.push(t);
+      }
+      const job = {...makeJob(sheet, p.settings, p.library, thumbs[0] ?? null), thumbs};
       const r = await sendJob(p.code, job);
       if (r.ok) {
         setMsg({kind: 'ok', text: `Sent ${job.name}. It shows up on your glasses in a few seconds.`});
-        setPrefs({history: [{id: job.id, name: job.name, at: Date.now(), job: {...job, thumb: null}}, ...getPrefs().history.filter(h => h.name !== job.name)].slice(0, 12)});
+        setPrefs({history: [{id: job.id, name: job.name, at: Date.now(), job: {...job, thumb: null, thumbs: []}}, ...getPrefs().history.filter(h => h.name !== job.name)].slice(0, 12)});
       } else
         setMsg({
           kind: 'err',
@@ -181,10 +218,12 @@ export default function App() {
             <div className="card">
               <h3>1. Photograph the sheet</h3>
               <p className="muted small">Flat, square-on and in good light. One photo of the whole sheet, or several of its parts (drawing, title block, bill of materials, close-ups of busy spots): up to 8 photos, all read together as one sheet.</p>
+              {photos.length > 1 && <p className="photo-count">{photos.length} photos · read together as one sheet</p>}
               <div className="photos">
-                {photos.map(ph => (
+                {photos.map((ph, i) => (
                   <div className="ph" key={ph.id}>
                     <img src={ph.url} alt="" style={{transform: `rotate(${ph.rot}deg)`}} />
+                    {photos.length > 1 && <span className="ph-num">{i + 1}</span>}
                     <div className="ph-tools">
                       <button aria-label="Rotate" onClick={() => setPhotos(ps => ps.map(x => (x.id === ph.id ? {...x, rot: (((x.rot + 90) % 360) as Photo['rot'])} : x)))}>
                         ⟳
@@ -196,7 +235,7 @@ export default function App() {
                   </div>
                 ))}
               </div>
-              <button className="btn primary wide live-btn" onClick={() => setLive({closeUp: false})} disabled={photos.length >= MAX_PHOTOS || busy === 'reading'}>
+              <button className="btn primary wide live-btn" onClick={() => setLive({closeUp: false})} disabled={photos.length >= MAX_PHOTOS || reading}>
                 Live scan <small>takes the photo and reads it by itself</small>
               </button>
               <div className="row">
@@ -215,11 +254,12 @@ export default function App() {
                     Anything Claude should know? (optional, remembered for every sheet)
                     <textarea rows={3} value={p.note} onChange={e => setPrefs({note: e.target.value})} placeholder="e.g. 6 inch HDPE, the 90s are long-sweep" />
                   </label>
-                  {busy === 'reading' ? (
+                  {reading ? (
                     <div className="reading">
                       <span className="spin" aria-hidden="true" />
                       <span>
-                        Reading the sheet… {seconds}s<small>usually 20–60 seconds</small>
+                        {busy === 'checking' ? 'Double-checking against the parts list…' : `Reading ${photos.length > 1 ? `${photos.length} photos as one sheet` : 'the sheet'}…`} {seconds}s
+                        <small>{busy === 'checking' ? 'something didn’t add up, so Claude is taking a second look' : 'usually 20–60 seconds'}</small>
                       </span>
                       <button className="btn" onClick={() => abort.current?.abort()}>
                         Stop
@@ -254,11 +294,11 @@ export default function App() {
 
           {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
 
-          {sheet && busy === 'reading' && (
+          {sheet && reading && (
             <div className="card reading">
               <span className="spin" aria-hidden="true" />
               <span>
-                Reading again with the close-up… {seconds}s<small>usually 20–60 seconds</small>
+                {busy === 'checking' ? 'Double-checking against the parts list…' : 'Reading again with the close-up…'} {seconds}s<small>usually 20–60 seconds</small>
               </span>
               <button className="btn" onClick={() => abort.current?.abort()}>
                 Stop
@@ -266,7 +306,7 @@ export default function App() {
             </div>
           )}
 
-          {sheet && busy !== 'reading' && !!sheet.unreadable?.length && photos.length > 0 && photos.length < MAX_PHOTOS && (
+          {sheet && !reading && !!sheet.unreadable?.length && photos.length > 0 && photos.length < MAX_PHOTOS && (
             <div className="card improve">
               <h3>Claude couldn't read {sheet.unreadable.length === 1 ? 'one thing' : `${sheet.unreadable.length} things`}</h3>
               <ul>

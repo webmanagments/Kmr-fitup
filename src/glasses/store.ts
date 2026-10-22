@@ -44,9 +44,9 @@ function save() {
       return;
     } catch {
       // Out of room: drop drawing photos from the oldest sheets first.
-      const withThumb = [...state.jobs].reverse().find(j => j.thumb);
+      const withThumb = [...state.jobs].reverse().find(j => j.thumb || j.thumbs?.length);
       if (!withThumb) return;
-      state = {...state, jobs: state.jobs.map(j => (j === withThumb ? {...j, thumb: null} : j))};
+      state = {...state, jobs: state.jobs.map(j => (j === withThumb ? {...j, thumb: null, thumbs: []} : j))};
     }
   }
 }

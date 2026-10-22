@@ -87,7 +87,13 @@ export async function sendJob(code: string, job: Job): Promise<SendResult> {
   if (c.length !== CODE_LEN) return {ok: false, why: 'bad'};
   if (!crypto.subtle) return {ok: false, why: 'offline'};
   let sealed = await seal(c, job);
-  if (sealed.ct.length > MAX_CT && job.thumb) sealed = await seal(c, {...job, thumb: null});
+  // Too big: keep fewer drawing photos (the sheet data itself always fits).
+  let pics = job.thumbs ?? [];
+  while (sealed.ct.length > MAX_CT && pics.length > 1) {
+    pics = pics.slice(0, Math.ceil(pics.length / 2));
+    sealed = await seal(c, {...job, thumbs: pics});
+  }
+  if (sealed.ct.length > MAX_CT && (job.thumb || pics.length)) sealed = await seal(c, {...job, thumb: null, thumbs: []});
   if (sealed.ct.length > MAX_CT) return {ok: false, why: 'tooBig'};
   const {id} = await boxOf(c);
   try {

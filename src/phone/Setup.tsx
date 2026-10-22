@@ -51,6 +51,10 @@ export function KeyCard() {
           ))}
         </select>
       </label>
+      <label className="check-row">
+        <input type="checkbox" checked={p.autoCheck} onChange={e => setPrefs({autoCheck: e.target.checked})} />
+        <span>Double-check automatically: if the reading doesn't add up (parts list, counts, lengths), Claude takes a second look. Costs a second read only when needed.</span>
+      </label>
       <p className="muted small">
         The key stays in this phone's browser and is only ever sent to Anthropic. Get one at console.anthropic.com. Reads so far: {p.spent.reads} ({Math.round((p.spent.input + p.spent.output) / 1000)}k tokens).
       </p>

@@ -220,6 +220,9 @@ try {
   await ph.fill('.code-input', code.toLowerCase());
   check('Code is cleaned up as typed', (await ph.inputValue('.code-input')) === `${code.slice(0, 4)}-${code.slice(4)}`);
   await ph.click('text=Done');
+  // Three photos of the sheet, so the glasses get every one for their drawing viewer.
+  await ph.setInputFiles('input[type=file][multiple]', ['public/icon-192.png', 'public/favicon.png', 'public/icon-192.png']);
+  await ph.waitForSelector('.photo-count');
   await ph.click('summary:has-text("sample")');
   await ph.click('.samples .btn:text-is("ISO-3")');
   await ph.waitForTimeout(400);
@@ -234,6 +237,25 @@ try {
   shots && (await ph.screenshot({path: `${shots}/p-03-sent.png`}));
   const got = await g.waitForSelector('.toast:has-text("ISO-77")', {timeout: 9000}).then(() => true, () => false);
   check('Glasses receive it', got && (await g.evaluate(() => JSON.parse(localStorage.getItem('kmr.fitup.v1')).jobs.some(j => j.name === 'ISO-77'))));
+  check('…with all 3 photos', await g.evaluate(() => JSON.parse(localStorage.getItem('kmr.fitup.v1')).jobs.find(j => j.name === 'ISO-77').thumbs.length === 3));
+  // Open it and flip through the photos in the drawing viewer.
+  await g.evaluate(() => document.querySelector('[data-nav=settings]')?.focus());
+  for (let i = 0; i < 8 && !(await focused()).startsWith('job-'); i++) await key('ArrowUp');
+  await key('ArrowLeft', 2);
+  await key('ArrowUp', 3);
+  const name = await g.evaluate(() => document.activeElement?.querySelector('.job-name')?.textContent);
+  check('ISO-77 is first on the list', name === 'ISO-77', name);
+  await key('Enter', 1, 600);
+  await key('ArrowUp');
+  await key('ArrowRight', 4);
+  await key('ArrowDown');
+  check('Sheet tab offers all the photos', (await g.textContent('.sheet-tab')).includes('Drawing (3 photos)'));
+  if (!/Drawing/.test(await focused())) await key('ArrowLeft');
+  await key('Enter', 1, 500);
+  check('Viewer opens on photo 1 of 3', (await g.textContent('.modal-title')).includes('photo 1 of 3'));
+  await key('ArrowRight', 1, 300);
+  check('Swipe shows photo 2 of 3', (await g.textContent('.modal-title')).includes('photo 2 of 3'));
+  await shot('16-photos');
   await shot('15-received');
 
   // Wide check for horizontal scroll on phone

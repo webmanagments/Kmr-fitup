@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {makeJob} from '../src/core/job.ts';
 import {formatCode, normalizeCode, newPairCode, open, receiveJobs, seal, sendJob} from '../src/core/pair.ts';
-import {normalizeSheet, buildRequest, readingFrom, SHEET_TOOL} from '../src/core/reader.ts';
-import {SHEET_3, SHEET_6} from '../src/core/samples.ts';
+import {normalizeSheet, buildRequest, checkPrompt, readingFrom, readingProblems, SHEET_TOOL} from '../src/core/reader.ts';
+import {SHEET_13, SHEET_3, SHEET_6} from '../src/core/samples.ts';
 import {solve} from '../src/core/solve.ts';
 
 const port = 9300 + Math.floor(Math.random() * 500);
@@ -64,10 +64,27 @@ try {
   assert.deepEqual(readingFrom({content: [{type: 'thinking'}, {type: 'tool_use', name: SHEET_TOOL.name, input: {legs: []}}]}), {legs: []});
   assert.deepEqual(readingFrom({content: [{type: 'text', text: 'Here:\n```json\n{"points": [], "legs": [1]}\n```'}]}), {points: [], legs: [1]});
   assert.equal(readingFrom({content: [{type: 'text', text: 'I cannot read this.'}]}), null);
-  assert.equal((req.messages[0].content as any[]).length, 3);
+  assert.equal((req.messages[0].content as any[]).length, 5); // 2 x (label + photo) + instructions
   assert.match(JSON.stringify(req), /all of ONE sheet/);
   assert.match(req.system, /EXAMPLE of a correct reading/);
-  console.log('ok reader cleanup and request');
+  assert.match(JSON.stringify(req.messages[0].content[0]), /Photo 1 of 2/);
+  assert.match(JSON.stringify(req.messages[0].content[2]), /Photo 2 of 2/);
+  assert.match(JSON.stringify(req), /ONE complete reading/);
+  // The double-check: a good reading has nothing to fix; a misread one is caught.
+  assert.deepEqual(readingProblems(SHEET_13), []);
+  const bad = structuredClone(SHEET_13);
+  bad.legs[3].cc = `23'-8 5/16"`; // a misread digit
+  const probs = readingProblems(bad);
+  assert.ok(probs.some(p => /BOM/.test(p)), probs.join(' | '));
+  const noWelds = structuredClone(SHEET_13);
+  noWelds.welds = [];
+  assert.ok(readingProblems(noWelds).some(p => /joint numbers/.test(p)));
+  const cp = checkPrompt(bad, probs);
+  assert.match(cp, /First reading:/);
+  assert.match(cp, /23'-8 5\/16/);
+  const req2 = buildRequest([{mediaType: 'image/jpeg', data: 'AAAA'}], 'claude-opus-5-5', '', cp);
+  assert.match(JSON.stringify(req2.messages[0].content.at(-1)), /calculator worked out the cuts/);
+  console.log('ok reader cleanup, request and double-check');
   console.log('\nall passed');
 } finally {
   srv.kill();

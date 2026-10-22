@@ -46,26 +46,27 @@ async function render(p: Photo, maxEdge: number, grey: boolean): Promise<HTMLCan
 
 const b64of = (dataUrl: string) => dataUrl.slice(dataUrl.indexOf(',') + 1);
 
-/** For Claude: long edge up to 2576 px, JPEG, kept under ~3.7 MB of base64. */
-export async function forClaude(p: Photo): Promise<{mediaType: 'image/jpeg'; data: string}> {
+/** For Claude: long edge up to 2576 px, JPEG, kept under maxLen of base64 (3.7 MB alone; less each when there are several). */
+export async function forClaude(p: Photo, maxLen = 3_700_000): Promise<{mediaType: 'image/jpeg'; data: string}> {
   const c = await render(p, 2576, false);
-  for (const q of [0.88, 0.8, 0.7, 0.6, 0.5]) {
+  for (const q of [0.88, 0.8, 0.7, 0.6, 0.5, 0.4]) {
     const data = b64of(c.toDataURL('image/jpeg', q));
-    if (data.length < 3_700_000 || q === 0.5) return {mediaType: 'image/jpeg', data};
+    if (data.length < maxLen || q === 0.4) return {mediaType: 'image/jpeg', data};
   }
   throw new Error('unreachable');
 }
 
 /** For the glasses' drawing viewer: greyscale, small enough to travel with the sheet. */
-export async function forGlasses(p: Photo): Promise<string> {
+export async function forGlasses(p: Photo, maxLen = 240_000): Promise<string> {
   for (const [edge, q] of [
     [1400, 0.6],
     [1200, 0.5],
     [1000, 0.45],
     [800, 0.4],
+    [700, 0.4],
   ] as const) {
     const url = (await render(p, edge, true)).toDataURL('image/jpeg', q);
-    if (url.length < 240_000) return url;
+    if (url.length < maxLen) return url;
   }
   return (await render(p, 600, true)).toDataURL('image/jpeg', 0.4);
 }

@@ -431,6 +431,7 @@ function SheetTab({job, sol, onDelete}: {job: JobT; sol: Solution; onDelete: () 
   const [viewer, setViewer] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const d = job.sheet.drawing;
+  const pics = job.thumbs?.length ? job.thumbs : job.thumb ? [job.thumb] : [];
   useEffect(() => {
     if (!confirm) return;
     const t = setTimeout(() => setConfirm(false), 4000);
@@ -454,14 +455,14 @@ function SheetTab({job, sol, onDelete}: {job: JobT; sol: Solution; onDelete: () 
         {sol.bomPipe !== null && <p className="muted">BOM pipe {formatLength(sol.bomPipe)} · math {formatLength(sol.totalNet)}</p>}
       </div>
       <div className="row bottom">
-        {job.thumb && (
+        {pics.length > 0 && (
           <button className="btn primary" data-autofocus onClick={() => setViewer(true)}>
-            View drawing
+            {pics.length > 1 ? `Drawing (${pics.length} photos)` : 'View drawing'}
           </button>
         )}
         <button
           className={`btn ${confirm ? 'danger' : ''}`}
-          data-autofocus={job.thumb ? undefined : true}
+          data-autofocus={pics.length ? undefined : true}
           onClick={() => {
             if (!confirm) return setConfirm(true);
             removeJob(job.id);
@@ -471,25 +472,32 @@ function SheetTab({job, sol, onDelete}: {job: JobT; sol: Solution; onDelete: () 
           {confirm ? 'Pinch again to delete' : 'Delete sheet'}
         </button>
       </div>
-      {viewer && job.thumb && <Viewer src={job.thumb} close={() => setViewer(false)} />}
+      {viewer && pics.length > 0 && <Viewer srcs={pics} close={() => setViewer(false)} />}
     </div>
   );
 }
 
-function Viewer({src, close}: {src: string; close: () => void}) {
+function Viewer({srcs, close}: {srcs: string[]; close: () => void}) {
+  const [at, setAt] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({x: 0, y: 0});
   const btn = useMemo(() => ({current: null as HTMLButtonElement | null}), []);
   useCapture(e => {
-    if (document.activeElement !== btn.current || zoom === 1) return false;
+    if (document.activeElement !== btn.current) return false;
     const d = dirOf(e);
     if (!d) return false;
+    if (zoom === 1) {
+      // Not zoomed: left / right flip between the photos of this sheet.
+      if (srcs.length < 2 || (d !== 'left' && d !== 'right')) return false;
+      setAt(i => (i + (d === 'right' ? 1 : srcs.length - 1)) % srcs.length);
+      return true;
+    }
     const s = 90 / zoom;
     setPan(p => ({x: p.x + (d === 'left' ? s : d === 'right' ? -s : 0), y: p.y + (d === 'up' ? s : d === 'down' ? -s : 0)}));
     return true;
   });
   return (
-    <Modal title="Drawing" onClose={close} wide>
+    <Modal title={srcs.length > 1 ? `Drawing · photo ${at + 1} of ${srcs.length}` : 'Drawing'} onClose={close} wide>
       <button
         ref={el => {
           btn.current = el;
@@ -501,9 +509,11 @@ function Viewer({src, close}: {src: string; close: () => void}) {
           if (zoom === 4) setPan({x: 0, y: 0});
         }}
       >
-        <img src={src} alt="The isometric drawing" style={{transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`}} />
+        <img src={srcs[at]} alt="The isometric drawing" style={{transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`}} />
       </button>
-      <p className="modal-hint">{zoom === 1 ? 'Pinch to zoom' : 'Swipe to move · pinch to zoom'} · Back to close</p>
+      <p className="modal-hint">
+        {zoom === 1 ? `Pinch to zoom${srcs.length > 1 ? ' · swipe ◀ ▶ for the other photos' : ''}` : 'Swipe to move · pinch to zoom'} · Back to close
+      </p>
     </Modal>
   );
 }

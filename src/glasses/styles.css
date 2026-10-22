@@ -812,3 +812,41 @@ button:focus {
   font-size: 16px;
   color: var(--muted);
 }
+
+/* Calculator */
+.calc {
+  padding: 0 0 12px;
+  gap: 8px;
+}
+.calc-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 16px;
+}
+.calc-row {
+  min-height: 64px;
+}
+.calc-out {
+  margin: 0 16px;
+  flex: 1;
+  border-top: 1.5px solid var(--s3);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 19px;
+}
+.calc-big {
+  font-size: 38px;
+  font-weight: 900;
+  color: var(--amber);
+}
+.calc-out .green {
+  font-size: 26px;
+  font-weight: 900;
+}
+.home-nav .btn[data-nav='settings'] {
+  flex: 0 0 60px;
+  font-size: 24px;
+}

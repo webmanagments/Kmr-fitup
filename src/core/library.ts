@@ -54,6 +54,11 @@ const LR45: Record<string, number> = {
   '0.5': 5 / 8, '0.75': 7 / 16, '1': 7 / 8, '1.25': 1, '1.5': 1 + 1 / 8, '2': 1 + 3 / 8, '2.5': 1 + 3 / 4, '3': 2, '3.5': 2 + 1 / 4, '4': 2 + 1 / 2,
   '5': 3 + 1 / 8, '6': 3 + 3 / 4, '8': 5, '10': 6 + 1 / 4, '12': 7 + 1 / 2, '14': 8 + 3 / 4, '16': 10, '18': 11 + 1 / 4, '20': 12 + 1 / 2, '24': 15,
 };
+// ASME B16.9 concentric reducer end-to-end (H) by the large end, and cap length (E).
+const REDUCER_H: Record<string, number> = {'0.75': 1.5, '1': 2, '1.25': 2, '1.5': 2.5, '2': 3, '2.5': 3.5, '3': 3.5, '3.5': 4, '4': 4, '5': 5, '6': 5.5, '8': 6, '10': 7, '12': 8, '14': 13, '16': 14, '18': 15, '20': 20, '24': 20};
+const CAP_E: Record<string, number> = {'1': 1.5, '1.25': 1.5, '1.5': 1.5, '2': 1.5, '2.5': 1.5, '3': 2, '3.5': 2.5, '4': 2.5, '5': 3, '6': 3.5, '8': 4, '10': 5, '12': 6, '14': 6.5, '16': 7, '18': 8, '20': 9, '24': 10.5};
+// ASME B16.5 class 150 weld-neck flange, length through hub (weld end to face).
+const WN150: Record<string, number> = {'0.5': 1.875, '0.75': 2.0625, '1': 2.1875, '1.25': 2.25, '1.5': 2.4375, '2': 2.5, '2.5': 2.75, '3': 2.75, '3.5': 2.8125, '4': 3, '5': 3.5, '6': 3.5, '8': 4, '10': 4, '12': 4.5, '14': 5, '16': 5, '18': 5.5, '20': 5.6875, '24': 6};
 const TEE: Record<string, number> = {
   '0.5': 1, '0.75': 1 + 1 / 8, '1': 1 + 1 / 2, '1.25': 1 + 7 / 8, '1.5': 2 + 1 / 4, '2': 2 + 1 / 2, '2.5': 3, '3': 3 + 3 / 8, '3.5': 3 + 3 / 4, '4': 4 + 1 / 8,
   '5': 4 + 7 / 8, '6': 5 + 5 / 8, '8': 7, '10': 8 + 1 / 2, '12': 10, '14': 11, '16': 12, '18': 13 + 1 / 2, '20': 15, '24': 17,
@@ -90,6 +95,12 @@ export function builtIn(type: FittingType, size: number, material: Material, siz
   if (type === 'elbow90') return {id: `b16.9-90-${k}`, type, size, material, takeout: LR90(size), note: 'ASME B16.9 long-radius 90°'};
   if (type === 'elbow45' && LR45[k]) return {id: `b16.9-45-${k}`, type, size, material, takeout: LR45[k], note: 'ASME B16.9 long-radius 45°'};
   if (type === 'tee' && TEE[k]) return {id: `b16.9-tee-${k}`, type, size, material, takeout: TEE[k], branch: TEE[k], note: 'ASME B16.9 straight tee'};
+  // Odd-angle elbows: long-radius, R × tan(angle ÷ 2).
+  if (type === 'elbow22') return {id: `lr-22-${k}`, type, size, material, takeout: sixteenth(LR90(size) * Math.tan((11.25 * Math.PI) / 180)), note: 'Long-radius cut elbow, R × tan(11 1/4°)'};
+  if (type === 'elbow11') return {id: `lr-11-${k}`, type, size, material, takeout: sixteenth(LR90(size) * Math.tan((5.625 * Math.PI) / 180)), note: 'Long-radius cut elbow, R × tan(5 5/8°)'};
+  if (type === 'reducer' && REDUCER_H[k]) return {id: `b16.9-red-${k}`, type, size, size2: size2 ?? null, material, takeout: null, laying: REDUCER_H[k], note: 'ASME B16.9 concentric reducer'};
+  if (type === 'cap' && CAP_E[k]) return {id: `b16.9-cap-${k}`, type, size, material, takeout: CAP_E[k], laying: CAP_E[k], note: 'ASME B16.9 cap'};
+  if (type === 'flange' && WN150[k]) return {id: `b16.5-wn150-${k}`, type, size, material, takeout: WN150[k], laying: WN150[k], note: 'ASME B16.5 class 150 weld neck (add the gasket)'};
   return null;
 }
 

@@ -45,7 +45,7 @@ function JobCard({job, open}: {job: Job; open: () => void}) {
   );
 }
 
-export default function Home({open, go, link}: {open: (id: string) => void; go: (s: 'pair' | 'settings') => void; link: Link}) {
+export default function Home({open, go, link}: {open: (id: string) => void; go: (s: 'pair' | 'settings' | 'calc') => void; link: Link}) {
   const s = useStore();
   const addSamples = () => {
     const have = new Set(getState().jobs.map(j => j.id));
@@ -100,8 +100,11 @@ export default function Home({open, go, link}: {open: (id: string) => void; go: 
         <button className="btn" data-nav="samples" onClick={addSamples}>
           Samples
         </button>
-        <button className="btn" data-nav="settings" onClick={() => go('settings')}>
-          Settings
+        <button className="btn" data-nav="calc" onClick={() => go('calc')}>
+          Calc
+        </button>
+        <button className="btn" data-nav="settings" onClick={() => go('settings')} aria-label="Settings">
+          ⚙
         </button>
       </nav>
     </div>

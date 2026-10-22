@@ -7,6 +7,7 @@ import {SAMPLES} from '../core/samples.ts';
 import type {Sheet} from '../core/types.ts';
 import {forClaude, forGlasses, loadPhoto, type Photo} from './image.ts';
 import {getPrefs, setPrefs, usePrefs} from './prefs.ts';
+import Calc from './Calc.tsx';
 import LiveScan from './LiveScan.tsx';
 import Review from './Review.tsx';
 import {KeyCard, LibraryCard, ShopCard} from './Setup.tsx';
@@ -16,7 +17,7 @@ const MAX_PHOTOS = 8;
 
 export default function App() {
   const p = usePrefs();
-  const [tab, setTab] = useState<'scan' | 'setup'>(() => (getPrefs().apiKey ? 'scan' : 'setup'));
+  const [tab, setTab] = useState<'scan' | 'calc' | 'setup'>(() => (getPrefs().apiKey ? 'scan' : 'setup'));
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
@@ -182,6 +183,9 @@ export default function App() {
           <button className={tab === 'scan' ? 'on' : ''} onClick={() => setTab('scan')}>
             Scan
           </button>
+          <button className={tab === 'calc' ? 'on' : ''} onClick={() => setTab('calc')}>
+            Calc
+          </button>
           <button className={tab === 'setup' ? 'on' : ''} onClick={() => setTab('setup')}>
             Setup
           </button>
@@ -189,6 +193,8 @@ export default function App() {
       </header>
 
       {live && <LiveScan title={live.closeUp ? 'Close-up' : 'Whole sheet'} target={live.closeUp ? live.target : 'Fit the whole sheet in the frame'} closeUp={live.closeUp} onPhoto={gotLivePhoto} onClose={() => setLive(null)} />}
+
+      {tab === 'calc' && <Calc />}
 
       {tab === 'setup' && (
         <>

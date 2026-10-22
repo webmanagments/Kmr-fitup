@@ -6,7 +6,7 @@ import {FITTING_NAME, type FittingType} from '../core/types.ts';
 import {formatLength, parseLength, parseSize} from '../core/units.ts';
 import {getPrefs, setPrefs, usePrefs} from './prefs.ts';
 
-function LenInput({value, onChange, placeholder, allowEmpty}: {value: number | null; onChange: (v: number | null) => void; placeholder?: string; allowEmpty?: boolean}) {
+export function LenInput({value, onChange, placeholder, allowEmpty}: {value: number | null; onChange: (v: number | null) => void; placeholder?: string; allowEmpty?: boolean}) {
   const [text, setText] = useState(value === null ? '' : formatLength(value));
   const parsed = parseLength(text);
   const bad = text.trim() !== '' && parsed === null;

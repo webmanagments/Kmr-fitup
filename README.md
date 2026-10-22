@@ -45,6 +45,15 @@ Rounded to the nearest 1/16". Take-outs come from the drawing first, then your o
 If only one take-out is missing, FitUp suggests the value that makes the pipe add up to the BOM
 total. Every result is cross-checked against printed pipe lengths, coordinates and the BOM.
 
+## Calculator
+
+The glasses (home → Calc) and the phone (Calc tab) do the everyday fitting maths: simple offsets
+(travel, run and multiplier for 11¼°, 22½°, 30°, 45° and 60° fittings, and the cut after both
+fittings' take-outs), rolling offsets (rise + roll → true offset → travel), elbow take-outs at any
+angle (R × tan(angle ÷ 2) for LR, SR, 3D and 5D), mitered turns (cut angle and cut-back) and
+equal-spread offsets. Steel also gets ASME B16.9 reducers and caps and B16.5 class 150 weld-neck
+flanges in the fitting table.
+
 ## Database rules
 
 Sheets travel through the same Firebase Realtime Database as the other KMR apps, under `fitup/`,

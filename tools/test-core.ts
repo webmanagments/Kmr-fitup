@@ -4,6 +4,7 @@ import {DEFAULT_SETTINGS, lookup, type TakeoutEntry} from '../src/core/library.t
 import {EXAMPLE, SHEET_11, SHEET_13, SHEET_2, SHEET_3, SHEET_6} from '../src/core/samples.ts';
 import {parseDirection, solve} from '../src/core/solve.ts';
 import {formatLength, parseLength, parseSize} from '../src/core/units.ts';
+import {angleFor, cutFromTravel, elbowTakeout, equalSpread, miter, offset, rollingOffset} from '../src/core/fitmath.ts';
 
 let n = 0;
 const t = (name: string, fn: () => void) => {
@@ -186,5 +187,33 @@ t('stick plan packs longest first', () => {
   const r = solve(EXAMPLE, {...DEFAULT_SETTINGS, stickLength: 50 * 12});
   assert.equal(r.plan.length, 2);
   assert.deepEqual(r.plan[1].pieces.map(p => p.id), ['P1', 'P3']);
+});
+t('fitter math: offsets, rolling offsets, elbow take-outs, miters', () => {
+  const near = (a: number, b: number, tol = 1 / 32) => assert.ok(Math.abs(a - b) <= tol, `${a} vs ${b}`);
+  near(offset(10, 45).travel, 14.142);
+  near(offset(10, 45).multiplier, 1.414, 0.001);
+  near(offset(12, 22.5).travel, 31.358);
+  near(offset(12, 22.5).run, 28.971);
+  near(offset(10, 30).travel, 20);
+  near(offset(10, 60).travel, 11.547);
+  const r = rollingOffset(12, 16, 45);
+  near(r.trueOffset, 20);
+  near(r.travel, 28.284);
+  near(elbowTakeout(6, 90), 9); // B16.9 LR 90
+  near(elbowTakeout(6, 45), 3.728, 0.03); // B16.9 says 3 3/4"
+  near(elbowTakeout(6, 90, 'SR'), 6);
+  const m = miter(6.625, 90, 3);
+  assert.equal(m.welds, 2);
+  near(m.cutAngle, 22.5, 0.001);
+  near(m.cutback, 2.744);
+  near(equalSpread(12, 45).difference, 4.971);
+  near(cutFromTravel(28.284, 3.75, 3.75, -1 / 16), 20.659);
+  near(angleFor(10, 10), 45, 0.001);
+  // Steel catalog additions
+  const lk = (type: any, size: number, s2?: number) => lookup([], type, size, 'steel', s2)?.entry;
+  assert.equal(lk('reducer', 6, 4)!.laying, 5.5);
+  assert.equal(lk('cap', 6)!.laying, 3.5);
+  assert.equal(lk('flange', 6)!.laying, 3.5);
+  assert.equal(lk('elbow22', 6)!.takeout, 1.8125); // 9 × tan 11.25° = 1.79
 });
 console.log(`\n${n} passed`);

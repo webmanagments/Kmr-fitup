@@ -195,13 +195,37 @@ try {
   await key('ArrowRight');
   check('Right on a card flips forward', (await g.textContent('.pager b')) === '2/2');
   await key('ArrowDown', 3);
-  check('Down from the last page reaches the buttons', ['pair', 'samples', 'settings'].includes(await focused()), await focused());
-  await key('ArrowLeft', 2);
+  check('Down from the last page reaches the buttons', ['pair', 'samples', 'calc', 'settings'].includes(await focused()), await focused());
+  await key('ArrowLeft', 3);
   check('Pair button', (await focused()) === 'pair');
   await key('Enter', 1, 500);
   check('Pair screen shows the code', (await g.textContent('.code')) === `${code.slice(0, 4)}-${code.slice(4)}`);
   await shot('14-pair');
   await noClip('pair');
+  await key('Escape', 1, 500);
+
+  // Calculator
+  await key('ArrowRight', 2);
+  check('Calc button', (await focused()) === 'calc', await focused());
+  await key('Enter', 1, 500);
+  check('Calc opens on the angle', /Fitting angle/.test(await focused()));
+  const out1 = await g.textContent('.calc-out');
+  check('24" offset at 45°: travel 2\'-9 15/16", cut 1\'-4 15/16" with two 6" HDPE 45s', out1.includes(`2'-9 15/16"`) && out1.includes(`1'-4 15/16"`), out1);
+  await shot('17-calc');
+  await noClip('calc');
+  await key('ArrowUp');
+  check('Up lands on the open tab', (await focused()) === 'calc-offset');
+  await key('ArrowRight');
+  check('Rolling tab', (await focused()) === 'calc-rolling');
+  const out2 = await g.textContent('.calc-out');
+  check('Rise 12" + roll 16" = 20" true offset, travel 2\'-4 5/16"', out2.includes(`1'-8"`) && out2.includes(`2'-4 5/16"`), out2);
+  await key('ArrowRight');
+  await key('ArrowDown');
+  await key('Enter');
+  await key('Enter');
+  const out3 = await g.textContent('.calc-out');
+  check('Elbow tab: a 6" LR 90 takes out 9"', out3.includes('9"'), out3);
+  await shot('18-calc-elbow');
   await key('Escape', 1, 500);
 
   // ---------------- Phone ----------------

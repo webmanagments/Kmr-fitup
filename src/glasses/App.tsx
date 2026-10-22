@@ -1,12 +1,13 @@
 import {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {receiveJobs} from '../core/pair.ts';
 import {focusDefault, focusEl, focusIsLost, installSpatialNav} from '../lib/spatial.ts';
+import Calc from './Calc.tsx';
 import Home, {Pair, Settings, type Link} from './Home.tsx';
 import Job, {type Tab} from './Job.tsx';
 import {popBack} from './Modal.tsx';
 import {addJobs, getState, useStore} from './store.ts';
 
-type Screen = {s: 'home'} | {s: 'pair'} | {s: 'settings'} | {s: 'job'; id: string};
+type Screen = {s: 'home'} | {s: 'pair'} | {s: 'settings'} | {s: 'calc'} | {s: 'job'; id: string};
 
 const appRoot: {current: HTMLDivElement | null} = {current: null};
 const park = () => appRoot.current?.focus({preventScroll: true});
@@ -119,6 +120,7 @@ export default function App() {
       {screen.s === 'home' && <Home open={id => go({s: 'job', id})} go={s => go({s})} link={link} />}
       {screen.s === 'pair' && <Pair link={link} />}
       {screen.s === 'settings' && <Settings />}
+      {screen.s === 'calc' && <Calc />}
       {screen.s === 'job' && job && <Job key={job.id} job={job} tab={tab} setTab={setTab} onLeave={() => go({s: 'home'})} />}
       {toast && (
         <div className="toast" role="status">

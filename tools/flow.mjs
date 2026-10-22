@@ -105,10 +105,10 @@ try {
   await shot('05-checks');
   await noClip('checks');
   const first = await g.textContent('.check');
-  check('First check is the fusion allowance', /Fusion allowance is not set/.test(first), first);
+  check('First check is the extra length', /Extra length is not set/.test(first), first);
   await key('Enter', 1, 400);
   check('Pinch opens the stepper', (await g.locator('.stepper').count()) === 1);
-  check('Stepper starts at 1/4"', (await g.textContent('.stepper-val')) === '1/4"');
+  check('Stepper starts at 3"', (await g.textContent('.stepper-val')) === '3"');
   await key('ArrowUp', 3, 60);
   await key('Escape', 1, 400);
   check('Back cancels without saving', (await g.locator('.stepper').count()) === 0 && /not set/.test(await g.textContent('.check')));
@@ -117,7 +117,7 @@ try {
   await key('ArrowRight', 2, 60);
   await key('ArrowLeft', 2, 60);
   await key('ArrowDown', 2, 60);
-  check('Swipes change the value', (await g.textContent('.stepper-val')) === '1/8"', await g.textContent('.stepper-val'));
+  check('Swipes change the value', (await g.textContent('.stepper-val')) === '2 7/8"', await g.textContent('.stepper-val'));
   await key('Enter', 1, 400);
   check('Pinch saves and closes', (await g.locator('.stepper').count()) === 0);
   check('Focus returns to the list', await g.evaluate(() => !!document.activeElement?.closest('.list-tab')));
@@ -132,7 +132,7 @@ try {
   check('Cuts tab', (await focused()) === 'tab-cuts');
   await key('ArrowDown');
   const cuts = await g.locator('.row-big').allTextContents();
-  check('ISO-6 cuts with 1/8" per fused end: 4\'-10 1/2", 21\'-8 1/4", 2 3/16"', cuts.join(',') === `4'-10 1/2",21'-8 1/4",2 3/16"`, cuts.join(', '));
+  check('ISO-6 cuts with 2 7/8" extra per pipe: 5\'-1 1/4", 21\'-10 7/8", 4 15/16"', cuts.join(',') === `5'-1 1/4",21'-10 7/8",4 15/16"`, cuts.join(', '));
   await key('Enter', 1, 300);
   check('Pinch marks a cut', (await g.locator('.row-btn.done').count()) === 1);
   await shot('08-cuts');
@@ -158,7 +158,7 @@ try {
   await key('ArrowLeft', 4);
   await key('ArrowDown', 1, 400);
   const info2 = await g.textContent('.info');
-  check('Selecting P1 shows its cut', info2.includes(`CUT 4'-10 1/2"`) && info2.includes('✓'), info2.slice(0, 80));
+  check('Selecting P1 shows its cut', info2.includes(`CUT 5'-1 1/4"`) && info2.includes('✓'), info2.slice(0, 80));
   await key('Enter', 1, 400);
   check('Pinch opens the part details', (await g.locator('.modal').count()) === 1 && (await g.textContent('.modal')).includes('Centre to centre'));
   await shot('11-detail');
@@ -186,7 +186,7 @@ try {
   await key('ArrowRight');
   await key('ArrowDown');
   const ex = await g.locator('.row-big').allTextContents();
-  check('Worked example: 50\' between two 5" 90s = 49\'-2" + 1/8" per fused end', ex.includes(`49'-2 1/4"`), ex.join(', '));
+  check('Worked example: 50\' between two 5" 90s = 49\'-2" + 2 7/8" per pipe', ex.includes(`49'-4 7/8"`), ex.join(', '));
   await key('Escape', 1, 600);
 
   // Pair screen

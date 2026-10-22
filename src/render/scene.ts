@@ -23,6 +23,7 @@ export interface Tube {
   kind: 'pipe' | 'fitting' | 'nopipe';
   part: string;
   unknown?: boolean; // drawn from a guessed size (take-out not known)
+  ghost?: boolean; // the next sheet's fitting, shown dashed past a sheet break
 }
 
 export interface Ring {
@@ -196,8 +197,35 @@ export function buildModel(sheet: Sheet, sol: Solution): Model {
     const leg = sheet.legs.find(l => l.from === pt.id || l.to === pt.id);
     const other = leg && posOf.get(leg.from === pt.id ? leg.to : leg.from);
     const dir = other ? unit(sub(pt.pos, other)) : v(1, 0, 0);
-    const text = pt.cont ? `→ ${pt.cont.replace(/^.*-(?=[^-]+-\d+$)/, '')}` : (pt.label ?? 'End');
-    tags.push({p: pt.pos, text, part: null, kind: 'end', dir});
+    let text = pt.cont ? `→ ${pt.cont.replace(/^.*-(?=[^-]+-\d+$)/, '')}` : (pt.label ?? 'End');
+    let tagAt = pt.pos;
+    // A 45 fused straight onto a wye branch at a sheet break: draw it dashed, turning the branch
+    // square to the run (as the drawing's dashed bend shows).
+    const piece = leg && sol.pieces.find(p => p.leg === leg.id);
+    const wye = leg && sol.fittings.find(f => f.fitting.type === 'lateral' && f.fitting.point === (leg.from === pt.id ? leg.to : leg.from));
+    const next = sheet.points.find(x => x.id === pt.id)?.next ?? (wye?.ports.find(x => x.leg === leg!.id)?.branch ? 'elbow45' : null);
+    if (pt.cont && piece?.status === 'nopipe' && wye && next === 'elbow45') {
+      const runLeg = wye.ports.map(x => legOf.get(x.leg)).find(l => l && l.id !== leg!.id);
+      const runOther = runLeg && posOf.get(runLeg.from === wye.fitting.point ? runLeg.to : runLeg.from);
+      const c = posOf.get(wye.fitting.point!);
+      if (runOther && c) {
+        const run = unit(sub(runOther, c));
+        const along = dir.x * run.x + dir.y * run.y + dir.z * run.z;
+        const out = unit(sub(dir, mul(run, along)));
+        const k = visualTakeout('elbow45', nps);
+        const bend = add(pt.pos, mul(dir, k));
+        const end = add(bend, mul(out, k));
+        const pts: Vec[] = [];
+        for (let i = 0; i <= 8; i++) {
+          const t = i / 8;
+          pts.push(add(add(mul(pt.pos, (1 - t) * (1 - t)), mul(bend, 2 * t * (1 - t))), mul(end, t * t)));
+        }
+        tubes.push({pts, r: r * 1.08, kind: 'fitting', part: `next-${pt.id}`, ghost: true});
+        text = `45 ${text}`;
+        tagAt = end;
+      }
+    }
+    tags.push({p: tagAt, text, part: null, kind: 'end', dir});
   }
 
   for (const part of parts) {

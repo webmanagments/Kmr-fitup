@@ -28,8 +28,10 @@ export interface TakeoutEntry {
 }
 
 export interface Settings {
-  /** HDPE: length used up at each fused pipe end (facing + bead). Added to the cut. null = not set yet. */
+  /** HDPE: extra length added to the cut (facing, bead, trimming room). null = not set yet. */
   fusionAllowance: number | null;
+  /** Whether that extra goes on once per pipe ('pipe') or on every fused end ('end'). */
+  allowancePer: 'pipe' | 'end';
   /** Steel butt weld: root gap per weld. Subtracted from the cut. */
   rootGap: number;
   /** Socket weld: gap left at the bottom of each socket. */
@@ -42,8 +44,18 @@ export interface Settings {
   brand: Brand;
 }
 
+/** More than this per pipe can't be a fusion allowance: it's a typo (feet for inches). */
+export const MAX_ALLOWANCE = 6;
+
+/** Fix a fat-fingered allowance (e.g. 2 feet typed where 3 inches was meant). */
+export function saneAllowance<T extends Partial<Settings>>(s: T): T {
+  if (typeof s.fusionAllowance === 'number' && s.fusionAllowance > MAX_ALLOWANCE) return {...s, fusionAllowance: 3, allowancePer: 'pipe'};
+  return s;
+}
+
 export const DEFAULT_SETTINGS: Settings = {
   fusionAllowance: null,
+  allowancePer: 'pipe',
   rootGap: 1 / 8,
   socketGap: 1 / 16,
   stickLength: 40 * 12,

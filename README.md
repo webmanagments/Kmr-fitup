@@ -26,8 +26,12 @@ change the view, pinch for the full maths. The tabs hold the cut list (pinch = c
 
 ```
 cut = centre-to-centre − take-out at each end − in-line fitting bodies
-      + fusion allowance per fused end (HDPE)    or    − root gap per weld (steel)
+      + extra length (HDPE: once per pipe, or per fused end)    or    − root gap per weld (steel)
 ```
+
+The extra length is set in Setup → Shop numbers (anything over 6" is treated as a typo and reset
+to 3"). Where fittings fuse straight together there's no pipe to cut; at a wye branch that ends at
+a sheet break, the next sheet's 45 goes straight on (drawn dashed in the 3D view).
 
 Rounded to the nearest 1/16". Take-outs come from the drawing first, then your own library
 (phone Setup, or set on the glasses), then catalog values:

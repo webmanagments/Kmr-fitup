@@ -5,7 +5,7 @@ import {DEFAULT_SETTINGS, type Settings, type TakeoutEntry} from './library.ts';
 import {makerFits} from './makers.ts';
 import {SHEET_13} from './samples.ts';
 import {solve} from './solve.ts';
-import type {Fitting, Joining, Leg, Point, Sheet, Weld, BomItem, FittingType} from './types.ts';
+import {FITTING_NAME, type Fitting, type Joining, type Leg, type Point, type Sheet, type Weld, type BomItem, type FittingType} from './types.ts';
 
 export const MODELS = [
   {id: 'claude-opus-5-5', name: 'Opus 5.5 (most accurate)'},
@@ -58,6 +58,11 @@ export const SHEET_TOOL = {
             el: {...NN, description: 'Centreline elevation in feet (EL+), only if printed for this point'},
             label: {...SN, description: 'Printed tag at this point, e.g. "Cont. on -3", "CO-12 TYPE CO1", "FD-101 TYPE A"'},
             cont: {...SN, description: 'Full drawing number this end continues on, if any'},
+            next: {
+              type: ['string', 'null'],
+              enum: ['elbow90', 'elbow45', 'elbow22', 'elbow11', 'tee', 'lateral', 'reducer', 'coupling', 'flange', 'valve', 'cap', 'cleanout', 'other', null],
+              description: 'At a Cont-on end: the next sheet\'s first fitting when it is drawn dashed just past the end (a dashed bend = an elbow). Null if none is drawn.',
+            },
           },
         },
       },
@@ -146,6 +151,7 @@ READ EXACTLY
 MODEL THE PIPE AS POINTS AND LEGS
 - A point is a fitting centre (where the centrelines meet) or an end of the pipe on this sheet. Make a leg for every straight centreline run between two points, including very short ones between two fittings that fuse straight together.
 - End points: a "Cont on: <drawing number>" box with coordinates (cont = that full drawing number; label "Cont. on -12"); a floor drain / hub ("BU-1304 TYPE: A": label it, no fitting there, the pipe runs to the printed point); a cleanout top ("CO-1301 TYPE: CO1" with coordinates: an end point, and the cleanout is a fitting of type cleanout sitting in-line at that end: inlineLeg = the riser leg, inlineAt = the end it is at).
+- Past a "Cont on" end the drawing often shows the next sheet's first fitting as a dashed ghost: a dashed curve is an elbow fused straight on there (on these sheets, the dashed bend right on a wye's branch is a 45° elbow: next = "elbow45"). Record it as "next" on that end point. It is not on this sheet's BOM.
 - A boxed group "3 / EL+ 3353.03 / 45°" tags the fitting at that point: BOM item 3, centre elevation 3353.03, a 45° fitting. "2 / EL+ 3352.01" is item 2 (look the item up in the BOM to know the fitting type).
 - Lateral wye: its point is where the branch centreline meets the run. Make one leg to each run side and one leg up the branch; set branchLeg.
 - Concentric reducer at a sheet break or between pipes: in-line fitting on that leg (inlineLeg/inlineAt), size "6\" x 4\"" (big end first).
@@ -281,7 +287,7 @@ export function readingProblems(sheet: Sheet, settings?: Settings, library: Take
   const someMakerFits = makerFits(sheet, settings ?? DEFAULT_SETTINGS).some(f => f.off !== null && Math.abs(f.off) <= 1 / 8);
   for (const c of sol.checks) {
     if (c.level !== 'error' && c.level !== 'warn') continue;
-    if (/^Need the |Fusion allowance|longer than a .* stick|^Couldn't read|^Using the /.test(c.text)) continue;
+    if (/^Need the |Fusion allowance|Extra length|longer than a .* stick|^Couldn't read|^Using the /.test(c.text)) continue;
     if (someMakerFits && /^Pipe total .* vs BOM/.test(c.text)) continue;
     out.push(c.text);
   }
@@ -354,6 +360,7 @@ export function normalizeSheet(raw: any): Sheet {
     el: num(p.el),
     label: str(p.label) ?? undefined,
     cont: str(p.cont) ?? undefined,
+    next: typeof p.next === 'string' && p.next in FITTING_NAME && p.next !== 'other' ? (p.next as Point['next']) : undefined,
   }));
   const pids = new Set(points.map(p => p.id));
   const legs: Leg[] = arr(raw?.legs)

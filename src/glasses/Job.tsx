@@ -1,7 +1,7 @@
 // One sheet on the glasses: the 3D model, the cut list, the weld map, checks and the drawing.
 import {useEffect, useMemo, useState} from 'react';
 import type {Job as JobT} from '../core/job.ts';
-import {lookup} from '../core/library.ts';
+import {MAX_ALLOWANCE, lookup} from '../core/library.ts';
 import type {Missing, Piece, SFitting, Solution} from '../core/solve.ts';
 import {FITTING_NAME, JOINING_NAME} from '../core/types.ts';
 import {formatLength} from '../core/units.ts';
@@ -26,6 +26,7 @@ const TABS: {id: Tab; name: string}[] = [
 interface StepReq {
   title: string;
   start: number;
+  max?: number;
   note?: string;
   save: (v: number) => void;
 }
@@ -72,9 +73,10 @@ export default function Job({job, tab, setTab, onLeave}: {job: JobT; tab: Tab; s
   };
   const fixAllowance = () =>
     setStep({
-      title: 'Fusion allowance per end',
-      start: getState().overrides.fusionAllowance ?? job.settings.fusionAllowance ?? 0.25,
-      note: 'What each pipe end loses to facing and the bead. Added to every cut. From your fusion procedure.',
+      title: settingsFor(job).allowancePer === 'end' ? 'Extra length per fused end' : 'Extra length per pipe',
+      start: settingsFor(job).fusionAllowance ?? 3,
+      max: MAX_ALLOWANCE,
+      note: settingsFor(job).allowancePer === 'end' ? 'Added to every fused end of every pipe.' : 'Added once to every pipe cut.',
       save: v => setOverride({fusionAllowance: v}),
     });
 
@@ -113,7 +115,7 @@ export default function Job({job, tab, setTab, onLeave}: {job: JobT; tab: Tab; s
         {tab === 'sheet' && <SheetTab job={job} sol={sol} onDelete={onLeave} />}
       </div>
       {detail !== undefined && <PartDetail job={job} sol={sol} part={detail} done={done} fused={fused} fix={fix} close={() => setDetail(undefined)} />}
-      {step && <Stepper title={step.title} start={step.start} note={step.note} onSave={step.save} onClose={() => setStep(null)} />}
+      {step && <Stepper title={step.title} start={step.start} max={step.max} note={step.note} onSave={step.save} onClose={() => setStep(null)} />}
     </div>
   );
 }
@@ -196,10 +198,16 @@ function PartDetail({job, sol, part, done, fused, fix, close}: {job: JobT; sol: 
       <Modal title={`${job.name} · cut list`} onClose={close} wide>
         <ul className="lines">
           {sol.pieces
-            .filter(p => p.status !== 'nopipe')
+            .filter(p => p.status !== 'nopipe' || p.direct)
             .map(p => (
               <li key={p.id}>
-                <b>{p.id}</b> {p.status === 'ok' ? formatLength(p.cut) : 'needs fitting size'} {done.has(p.id) && '✓'}
+                {p.status === 'nopipe' ? (
+                  p.direct
+                ) : (
+                  <>
+                    <b>{p.id}</b> {p.status === 'ok' ? formatLength(p.cut) : 'needs fitting size'} {done.has(p.id) && '✓'}
+                  </>
+                )}
               </li>
             ))}
         </ul>
@@ -314,7 +322,8 @@ function FittingLines({f, sol}: {f: SFitting; sol: Solution}) {
 }
 
 function Cuts({job, sol, done, fix}: {job: JobT; sol: Solution; done: Set<string>; fix: (m: Missing) => void}) {
-  const rows = sol.pieces.filter(p => p.status !== 'nopipe');
+  // Real pipes first, then the spots where fittings fuse straight together (no pipe to cut).
+  const rows = [...sol.pieces.filter(p => p.status !== 'nopipe'), ...sol.pieces.filter(p => p.status === 'nopipe' && p.direct)];
   const okRows = rows.filter(p => p.status === 'ok');
   return (
     <div className="list-tab">
@@ -328,17 +337,24 @@ function Cuts({job, sol, done, fix}: {job: JobT; sol: Solution; done: Set<string
             data-row
             onClick={() => {
               if (p.status === 'ok') toggle(job.id, 'cut', p.id);
-              else if (sol.missing[0]) fix(sol.missing[0]);
+              else if (p.status !== 'nopipe' && sol.missing[0]) fix(sol.missing[0]);
             }}
           >
-            <b className="chip">{p.id}</b>
-            <span className="row-main">
-              <b className={`row-big ${p.status === 'ok' ? '' : 'red'}`}>{p.status === 'ok' ? formatLength(p.cut) : p.status === 'missing' ? 'needs fitting size' : 'check run'}</b>
-              <small>
-                {p.takeout !== null && p.deductions.length ? `take-out ${formatLength(p.takeout)} · ` : ''}
-                {p.endsText[0]} → {p.endsText[1]}
-              </small>
-            </span>
+            <b className="chip">{p.status === 'nopipe' ? '—' : p.id}</b>
+            {p.status === 'nopipe' ? (
+              <span className="row-main">
+                <b className="row-mid">No pipe</b>
+                <small>{p.direct!.replace(/^No pipe: /, '')}</small>
+              </span>
+            ) : (
+              <span className="row-main">
+                <b className={`row-big ${p.status === 'ok' ? '' : 'red'}`}>{p.status === 'ok' ? formatLength(p.cut) : p.status === 'missing' ? 'needs fitting size' : 'check run'}</b>
+                <small>
+                  {p.takeout !== null && p.deductions.length ? `take-out ${formatLength(p.takeout)} · ` : ''}
+                  {p.endsText[0]} → {p.endsText[1]}
+                </small>
+              </span>
+            )}
             <span className={`tick ${done.has(p.id) ? 'on' : ''}`} aria-label={done.has(p.id) ? 'cut' : 'not cut'}>
               {done.has(p.id) ? '✓' : ''}
             </span>
@@ -404,13 +420,13 @@ function Checks({sol, fix, fixAllowance, joining, maker}: {sol: Solution; fix: (
         // A parts list drawn with another maker's fittings won't match: say that, not "warning".
         const drawnWith = maker && /adds up with (.+?) fittings/.exec(maker)?.[1];
         if (drawnWith && /^Pipe total .* vs BOM/.test(c.text)) return {key: `c${i}`, level: 'info', text: c.text, hint: `The drawing was worked out with ${drawnWith} fittings; your cuts use your fittings' real sizes.`};
-        return {key: `c${i}`, level: c.level, text: c.text, hint: c.hint, act: /allowance/i.test(c.text) && joining === 'butt_fusion' ? fixAllowance : undefined, actText: 'Set'};
+        return {key: `c${i}`, level: c.level, text: c.text, hint: c.hint, act: /allowance|Extra length/i.test(c.text) && joining === 'butt_fusion' ? fixAllowance : undefined, actText: 'Set'};
       }),
   ];
   const order: Record<string, number> = {error: 0, warn: 1, info: 2, ok: 3};
   rows.sort((a, b) => order[a.level] - order[b.level]);
   if (maker) rows.push({key: 'maker', level: /adds up with/.test(maker) ? 'ok' : 'info', text: maker});
-  if (joining === 'butt_fusion' && !rows.some(r => /allowance/i.test(r.text))) rows.push({key: 'allow', level: 'info', text: 'Fusion allowance', hint: 'Pinch to change it', act: fixAllowance, actText: 'Set'});
+  if (joining === 'butt_fusion' && !rows.some(r => /allowance|Extra length/i.test(r.text))) rows.push({key: 'allow', level: 'info', text: 'Extra length on the cuts', hint: 'Pinch to change it', act: fixAllowance, actText: 'Set'});
   return (
     <div className="list-tab">
       <Paged

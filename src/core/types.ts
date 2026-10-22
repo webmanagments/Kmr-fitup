@@ -36,6 +36,7 @@ export interface Point {
   el?: number | null; // Elevation, ft
   label?: string; // "Cont. on …-6", "BU-2301E TYPE A"
   cont?: string; // drawing number this end continues on
+  next?: FittingType | null; // the next sheet's first fitting, drawn dashed just past this end
 }
 
 export interface Fitting {

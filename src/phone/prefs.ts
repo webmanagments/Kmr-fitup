@@ -2,7 +2,7 @@
 // library, and recently sent sheets. All in this browser's local storage only.
 import {useSyncExternalStore} from 'react';
 import type {Job} from '../core/job.ts';
-import {DEFAULT_SETTINGS, type Settings, type TakeoutEntry} from '../core/library.ts';
+import {DEFAULT_SETTINGS, saneAllowance, type Settings, type TakeoutEntry} from '../core/library.ts';
 import {DEFAULT_MODEL} from '../core/reader.ts';
 
 export interface Prefs {
@@ -21,6 +21,12 @@ export interface Prefs {
 const KEY = 'kmr.fitup.phone.v1';
 const listeners = new Set<() => void>();
 let prefs: Prefs = load();
+try {
+  // Keep any fix made while loading (e.g. an extra length typed in feet instead of inches).
+  if (localStorage.getItem(KEY)) localStorage.setItem(KEY, JSON.stringify(prefs));
+} catch {
+  /* private mode */
+}
 
 function load(): Prefs {
   let p: Partial<Prefs> = {};
@@ -33,7 +39,7 @@ function load(): Prefs {
     code: typeof p.code === 'string' ? p.code : '',
     apiKey: typeof p.apiKey === 'string' ? p.apiKey : '',
     model: typeof p.model === 'string' ? p.model : DEFAULT_MODEL,
-    settings: {...DEFAULT_SETTINGS, ...(p.settings ?? {}), ...(p.brandChosen ? {} : {brand: DEFAULT_SETTINGS.brand})},
+    settings: saneAllowance({...DEFAULT_SETTINGS, ...(p.settings ?? {}), ...(p.brandChosen ? {} : {brand: DEFAULT_SETTINGS.brand})}),
     brandChosen: !!p.brandChosen,
     library: Array.isArray(p.library) ? p.library : [],
     history: Array.isArray(p.history) ? p.history.slice(0, 12) : [],

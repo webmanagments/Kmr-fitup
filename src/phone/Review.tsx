@@ -142,9 +142,7 @@ export default function Review({sheet, setSheet, settings, library}: {sheet: She
               <tr key={p.id} className={p.status} onClick={() => setSel(p.status === 'nopipe' ? null : p.id)}>
                 <td>
                   <b>{p.status === 'nopipe' ? '—' : p.id}</b>
-                  <small>
-                    {p.endsText[0]} → {p.endsText[1]}
-                  </small>
+                  <small>{p.status === 'nopipe' && p.direct ? p.direct.replace(/^No pipe: /, '') : `${p.endsText[0]} → ${p.endsText[1]}`}</small>
                 </td>
                 <td className="cut">{p.status === 'ok' ? formatLength(p.cut) : p.status === 'nopipe' ? 'no pipe' : p.status === 'missing' ? 'needs fitting size' : 'too short!'}</td>
                 <td className="how">

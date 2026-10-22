@@ -58,6 +58,8 @@ export interface Piece {
   ends: [number | null, number | null];
   /** The pipe's take-out: everything the fittings at its ends use up (null while a fitting size is unknown). */
   takeout: number | null;
+  /** No pipe here: what fuses straight onto what (e.g. the next sheet's 45 onto a wye branch). */
+  direct?: string;
 }
 
 export interface Port {
@@ -424,7 +426,10 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
     const adjust: Deduction[] = [];
     if (sheet.joining === 'butt_fusion') {
       if (settings.fusionAllowance === null) unsetAllowance = unsetAllowance || joints > 0;
-      else if (joints && settings.fusionAllowance) adjust.push({label: `Fusion allowance × ${joints}`, inches: settings.fusionAllowance * joints, source: 'library'});
+      else if (joints && settings.fusionAllowance) {
+        const perEnd = settings.allowancePer === 'end';
+        adjust.push({label: perEnd ? `Extra × ${joints} fused ends` : 'Extra length', inches: settings.fusionAllowance * (perEnd ? joints : 1), source: 'library'});
+      }
     } else if (sheet.joining === 'butt_weld' && joints && settings.rootGap) adjust.push({label: `Root gap × ${joints}`, inches: -settings.rootGap * joints, source: 'library'});
     else if (sheet.joining === 'socket_weld' && joints && settings.socketGap) adjust.push({label: `Socket gap × ${joints}`, inches: -settings.socketGap * joints, source: 'library'});
 
@@ -469,6 +474,37 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
       takeout: deductions.every(d => d.inches !== null) ? roundTo(deductions.reduce((s, d) => s + (d.inches ?? 0), 0)) : null,
     });
   });
+  // Fitting to fitting with no pipe: say what fuses onto what. At a sheet break the next fitting is
+  // on the next sheet (drawn dashed past the break); a wye's branch takes a 45 there.
+  for (const p of pieces) {
+    if (p.status !== 'nopipe') continue;
+    const name = (pid: string) => {
+      const f = fitAt.get(pid);
+      if (!f) return null;
+      const port = f.ports.find(x => x.leg === p.leg);
+      return `${f.name.replace(/ \(item \d+\)$/, '')}${port?.branch ? ' branch' : port?.role === 'outlet' ? ' outlet' : ''}`;
+    };
+    [p.from, p.to].forEach((pid, i) => {
+      const pt = byPoint.get(pid);
+      if (!pt?.cont) return;
+      const otherId = i === 0 ? p.to : p.from;
+      const f = fitAt.get(otherId);
+      const branch = f?.fitting.type === 'lateral' && f.ports.find(x => x.leg === p.leg)?.branch;
+      const next = pt.next && FITTING_NAME[pt.next] ? pt.next : branch ? 'elbow45' : null;
+      const sheetNo = pt.cont.replace(/^.*-(?=[^-]+-\d+$)/, '');
+      if (!next) {
+        p.direct = `No pipe on this sheet: the ${name(otherId) ?? 'fitting'} ends right at the break to sheet ${sheetNo}.`;
+        return;
+      }
+      p.endsText[i] = `${FITTING_NAME[next]} (sheet ${sheetNo})`;
+      p.direct = `No pipe: the ${FITTING_NAME[next]} on sheet ${sheetNo} fuses straight onto the ${name(otherId) ?? 'fitting'}.`;
+    });
+    if (!p.direct) {
+      const a = name(p.from);
+      const b = name(p.to);
+      if (a && b) p.direct = `No pipe: the ${a} fuses straight onto the ${b}.`;
+    }
+  }
   // Number the real pipe pieces 1, 2, 3 (fitting-to-fitting runs get no number).
   let n = 0;
   for (const p of pieces) p.id = p.status === 'nopipe' ? `F${p.leg}` : `P${++n}`;
@@ -482,7 +518,7 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
     const near = !piece ? 'Pipe' : piece.status === 'nopipe' ? piece.endsText[piece.from === w.point ? 1 : 0] : `Pipe ${piece.id}`;
     let joins: string;
     if (f) joins = `${near} ↔ ${f.name}`;
-    else if (pt?.cont) joins = `${near} ↔ sheet ${pt.cont.replace(/^.*-(?=[^-]+-\d+$)/, '')}`;
+    else if (pt?.cont) joins = piece?.status === 'nopipe' ? `${near} ↔ ${piece.endsText[piece.from === w.point ? 0 : 1]}` : `${near} ↔ sheet ${pt.cont.replace(/^.*-(?=[^-]+-\d+$)/, '')}`;
     else {
       const inl = piece && sheet.fittings.find(x => x.inlineLeg === piece.leg);
       joins = inl ? `${near} ↔ ${fittings.find(x => x.id === inl.id)!.name}` : `${near} ↔ ${pt?.label ?? 'end'}`;
@@ -514,7 +550,7 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
       hint: 'It sets the take-out on the pipes it joins. Get it from the fitting maker’s sheet or the drawing.',
     });
   if (unsetAllowance && sheet.joining === 'butt_fusion')
-    checks.push({level: 'warn', text: 'Fusion allowance is not set: cuts are shown fitting-to-fitting with nothing added for facing and bead.', hint: 'Set it in Settings from your fusion procedure.'});
+    checks.push({level: 'warn', text: 'Extra length is not set: cuts are shown fitting-to-fitting with nothing added.', hint: 'Set it in Settings from your fusion procedure.'});
 
   const ok = pieces.filter(p => p.status === 'ok');
   const totalCut = ok.reduce((s, p) => s + (p.cut ?? 0), 0);

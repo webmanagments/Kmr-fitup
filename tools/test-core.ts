@@ -1,6 +1,6 @@
 // node --experimental-strip-types tools/test-core.ts
 import assert from 'node:assert/strict';
-import {DEFAULT_SETTINGS, lookup, type TakeoutEntry} from '../src/core/library.ts';
+import {DEFAULT_SETTINGS, lookup, saneAllowance, type TakeoutEntry} from '../src/core/library.ts';
 import {EXAMPLE, SHEET_11, SHEET_13, SHEET_2, SHEET_3, SHEET_3B, SHEET_6} from '../src/core/samples.ts';
 import {parseDirection, solve} from '../src/core/solve.ts';
 import {formatLength, parseLength, parseSize} from '../src/core/units.ts';
@@ -63,12 +63,28 @@ t('worked example: 50\' between two 5" 90s cuts 49\'-2"', () => {
   assert.equal(z, 98);
 });
 t('fusion allowance is added per fused end; root gap taken off for steel', () => {
-  const r = solve(EXAMPLE, {...DEFAULT_SETTINGS, fusionAllowance: 1 / 4});
+  const r = solve(EXAMPLE, {...DEFAULT_SETTINGS, fusionAllowance: 1 / 4, allowancePer: 'end'});
   assert.deepEqual(r.pieces.map(p => formatLength(p.cut)), [`9'-7 1/4"`, `49'-2 1/2"`, `7'-9 1/4"`]);
   assert.ok(!r.checks.some(c => /allowance is not set/.test(c.text)));
   const steel = solve({...EXAMPLE, joining: 'butt_weld', material: '6" STD CS'});
   assert.equal(steel.material, 'steel');
   assert.deepEqual(steel.pieces.map(p => formatLength(p.cut)), [`9'-6 7/8"`, `49'-1 3/4"`, `7'-8 7/8"`]);
+});
+t('extra length per pipe goes on once; a feet-for-inches typo is fixed to 3"', () => {
+  const r = solve(EXAMPLE, {...DEFAULT_SETTINGS, fusionAllowance: 3});
+  assert.deepEqual(r.pieces.map(p => formatLength(p.cut)), [`9'-10"`, `49'-5"`, `8'-0"`]);
+  const typo = saneAllowance({...DEFAULT_SETTINGS, fusionAllowance: 24, allowancePer: 'end' as const});
+  assert.equal(typo.fusionAllowance, 3);
+  assert.equal(typo.allowancePer, 'pipe');
+  assert.equal(saneAllowance({...DEFAULT_SETTINGS, fusionAllowance: 1 / 4}).fusionAllowance, 1 / 4);
+});
+t('a wye branch at a sheet break takes the next sheet\'s 45 straight on (no pipe)', () => {
+  const r = solve(SHEET_3B, GF);
+  const direct = r.pieces.filter(p => p.status === 'nopipe' && /wye branch/.test(p.direct ?? ''));
+  assert.equal(direct.length, 2);
+  assert.ok(direct.every(p => /45° elbow on sheet/.test(p.direct!)), direct.map(p => p.direct).join(' | '));
+  const w = r.welds.find(x => x.number === '1616')!;
+  assert.match(w.joins, /wye.*↔ 45° elbow \(sheet/);
 });
 t('steel falls back to ASME B16.9 take-outs', () => {
   const s = {...EXAMPLE, joining: 'butt_weld' as const, material: 'CS', fittings: EXAMPLE.fittings.map(f => ({...f, takeout: null}))};
@@ -88,7 +104,7 @@ t('sheet -3: one lateral wye, pipe 19\'-1 9/16" = the BOM (19\'-9 5/16" is wye c
   assert.ok(r.ready);
   const w = r.points.find(p => p.id === 'W')!.pos!;
   assert.ok(Math.abs(w.x / 12 - 1085.86) < 0.01);
-  assert.match(r.welds.find(x => x.number === '1146')!.joins, /wye.*↔ sheet ISO-6/);
+  assert.match(r.welds.find(x => x.number === '1146')!.joins, /wye.*↔ 45° elbow \(sheet ISO-6\)/);
 });
 t('sheet -6: catalog molded take-outs add up to its BOM to the 1/16"', () => {
   const r = solve(SHEET_6, GF);

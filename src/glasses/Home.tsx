@@ -7,7 +7,7 @@ import {formatLength} from '../core/units.ts';
 import {Stepper} from './Modal.tsx';
 import Paged from './Paged.tsx';
 import {addJobs, clearLibrary, getState, newCode, progressOf, setOverride, solveJob, useStore} from './store.ts';
-import {BRANDS, DEFAULT_SETTINGS, type Brand} from '../core/library.ts';
+import {BRANDS, DEFAULT_SETTINGS, MAX_ALLOWANCE, type Brand} from '../core/library.ts';
 
 export type Link = 'ok' | 'rules' | 'offline' | 'idle';
 /** The sheet last opened, so coming back lands on its page. */
@@ -156,8 +156,8 @@ export function Settings() {
       <div className="set-rows">
         <button className="row-btn" data-autofocus onClick={() => setEdit('allow')}>
           <span className="row-main">
-            <b className="row-mid">Fusion allowance per end</b>
-            <small>Added to each fused pipe end (facing + bead)</small>
+            <b className="row-mid">Extra length</b>
+            <small>Added to the cuts (per pipe or per end, as set on the phone)</small>
           </span>
           <b className="val">{allow === undefined ? 'from phone' : formatLength(allow)}</b>
         </button>
@@ -199,10 +199,10 @@ export function Settings() {
       </div>
       {edit === 'allow' && (
         <Stepper
-          title="Fusion allowance per end"
-          start={allow ?? 0.25}
-          max={2}
-          note="Check your fusion procedure. Many crews use about 1/8 to 1/4 inch per end for 6 inch."
+          title="Extra length"
+          start={allow ?? 3}
+          max={MAX_ALLOWANCE}
+          note="Added to the cuts. Swipe up or down for 1/16 inch, left or right for a whole inch."
           onSave={v => setOverride({fusionAllowance: v})}
           onClose={() => setEdit(null)}
         />

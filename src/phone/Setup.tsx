@@ -1,14 +1,15 @@
 // Phone settings: Claude key and model, shop numbers, and the fitting take-out library.
 import {useState} from 'react';
-import {BRANDS, DEFAULT_SETTINGS, type Brand, type Material, type TakeoutEntry} from '../core/library.ts';
+import {BRANDS, DEFAULT_SETTINGS, MAX_ALLOWANCE, type Brand, type Material, type TakeoutEntry} from '../core/library.ts';
 import {MODELS} from '../core/reader.ts';
 import {FITTING_NAME, type FittingType} from '../core/types.ts';
 import {formatLength, parseLength, parseSize} from '../core/units.ts';
 import {getPrefs, setPrefs, usePrefs} from './prefs.ts';
 
-export function LenInput({value, onChange, placeholder, allowEmpty}: {value: number | null; onChange: (v: number | null) => void; placeholder?: string; allowEmpty?: boolean}) {
+export function LenInput({value, onChange, placeholder, allowEmpty, max}: {value: number | null; onChange: (v: number | null) => void; placeholder?: string; allowEmpty?: boolean; max?: number}) {
   const [text, setText] = useState(value === null ? '' : formatLength(value));
-  const parsed = parseLength(text);
+  const raw = parseLength(text);
+  const parsed = raw !== null && max !== undefined && raw > max ? null : raw;
   const bad = text.trim() !== '' && parsed === null;
   return (
     <input
@@ -18,7 +19,7 @@ export function LenInput({value, onChange, placeholder, allowEmpty}: {value: num
       onChange={e => {
         setText(e.target.value);
         const v = parseLength(e.target.value);
-        if (v !== null) onChange(v);
+        if (v !== null && (max === undefined || v <= max)) onChange(v);
         else if (allowEmpty && e.target.value.trim() === '') onChange(null);
       }}
       onBlur={() => parsed !== null && setText(formatLength(parsed))}
@@ -83,8 +84,15 @@ export function ShopCard() {
       </label>
       <div className="grid2">
         <label>
-          HDPE fusion allowance per end
-          <LenInput value={s.fusionAllowance} onChange={v => set('fusionAllowance', v)} placeholder="not set" allowEmpty />
+          Extra length on each cut
+          <LenInput value={s.fusionAllowance} onChange={v => set('fusionAllowance', v)} placeholder="not set" allowEmpty max={MAX_ALLOWANCE} />
+        </label>
+        <label>
+          Added
+          <select value={s.allowancePer ?? 'pipe'} onChange={e => setPrefs({settings: {...getPrefs().settings, allowancePer: e.target.value as 'pipe' | 'end'}})}>
+            <option value="pipe">once per pipe</option>
+            <option value="end">on each fused end</option>
+          </select>
         </label>
         <label>
           Steel root gap
@@ -99,7 +107,9 @@ export function ShopCard() {
           <LenInput value={s.cutWaste} onChange={v => set('cutWaste', v ?? DEFAULT_SETTINGS.cutWaste)} />
         </label>
       </div>
-      <p className="muted small">The fusion allowance is added to each fused pipe end (facing + bead). Take it from your fusion procedure; leave it empty to cut fitting-to-fitting.</p>
+      <p className="muted small">
+        The extra length is added to every pipe cut{s.fusionAllowance ? `: a pipe that works out to 10'-0" fitting to fitting is cut at ${formatLength(120 + s.fusionAllowance * ((s.allowancePer ?? 'pipe') === 'end' ? 2 : 1))}` : ''}. Leave it empty to cut fitting to fitting. Type inches (3) or feet and inches (1'-2"); anything over {MAX_ALLOWANCE}" is refused as a typo.
+      </p>
     </div>
   );
 }

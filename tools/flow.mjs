@@ -89,15 +89,15 @@ try {
   check('Opens the sheet on the 3D view', (await focused()) === 'model');
   await shot('03-model');
   await noClip('model');
-  check('ISO-6 waits on take-outs', (await g.textContent('.info')).includes('Waiting on 2 take-outs'));
+  check('ISO-6 is ready with catalog take-outs', (await g.textContent('.info')).includes(`2 pipes · 26'-4 11/16"`), await g.textContent('.info'));
   await key('ArrowRight', 1, 500);
   const info1 = await g.textContent('.info');
-  check('Right selects the first part', /Drain|90°|P1/.test(info1), info1.slice(0, 60));
+  check('Right selects the first part', /P1/.test(info1) && info1.includes(`CUT 4'-10 9/16"`), info1.slice(0, 80));
   await shot('04-part');
   await key('ArrowDown', 1, 600);
   check('Down changes the view', (await g.textContent('.model-view')) === 'Spin');
   await key('ArrowDown', 4, 150);
-  // Checks tab: set the take-outs with the stepper
+  // Checks tab: set the fusion allowance with the stepper
   await key('ArrowUp');
   check('Up goes to the open tab', (await focused()) === 'tab-model');
   await key('ArrowRight', 3);
@@ -106,27 +106,25 @@ try {
   await shot('05-checks');
   await noClip('checks');
   const first = await g.textContent('.check');
-  check('First check is the missing 90 take-out', /take-out for 6" 90/.test(first), first);
+  check('First check is the fusion allowance', /Fusion allowance is not set/.test(first), first);
   await key('Enter', 1, 400);
   check('Pinch opens the stepper', (await g.locator('.stepper').count()) === 1);
+  check('Stepper starts at 1/4"', (await g.textContent('.stepper-val')) === '1/4"');
+  await key('ArrowUp', 3, 60);
+  await key('Escape', 1, 400);
+  check('Back cancels without saving', (await g.locator('.stepper').count()) === 0 && /not set/.test(await g.textContent('.check')));
+  await key('Enter', 1, 400);
   await shot('06-stepper');
-  check('Stepper starts at a 90 guess', (await g.textContent('.stepper-val')) === '9"');
   await key('ArrowRight', 2, 60);
   await key('ArrowLeft', 2, 60);
-  await key('ArrowDown', 6, 60);
-  check('Swipes change the value', (await g.textContent('.stepper-val')) === '8 5/8"', await g.textContent('.stepper-val'));
+  await key('ArrowDown', 2, 60);
+  check('Swipes change the value', (await g.textContent('.stepper-val')) === '1/8"', await g.textContent('.stepper-val'));
   await key('Enter', 1, 400);
   check('Pinch saves and closes', (await g.locator('.stepper').count()) === 0);
-  check('Focus returns to the list', (await g.evaluate(() => !!document.activeElement?.closest('.list-tab'))));
-  const first2 = await g.textContent('.check');
-  check('Next the 45 take-out, with the BOM suggestion', /45° elbow/.test(first2) && /BOM says about 8 1\/2"/.test(first2), first2);
-  await key('Enter', 1, 400);
-  check('Stepper starts at the BOM suggestion', (await g.textContent('.stepper-val')) === '8 1/2"');
-  await key('Enter', 1, 400);
+  check('Focus returns to the list', await g.evaluate(() => !!document.activeElement?.closest('.list-tab')));
   const checks = await g.locator('.check').allTextContents();
-  check('No errors left; BOM matches', !checks.some(c => /Need the/.test(c)) && checks.some(c => /matches the BOM/.test(c)), checks.join(' | ').slice(0, 200));
+  check('No errors; BOM matches', !checks.some(c => /Need the|not set/.test(c)) && checks.some(c => /matches the BOM/.test(c)), checks.join(' | ').slice(0, 200));
   await shot('07-checks-done');
-  // Back escape closes stepper without saving
   await key('ArrowUp', 4);
   check('Up from the first row lands on Checks tab', (await focused()) === 'tab-checks');
 
@@ -135,7 +133,7 @@ try {
   check('Cuts tab', (await focused()) === 'tab-cuts');
   await key('ArrowDown');
   const cuts = await g.locator('.row-big').allTextContents();
-  check('ISO-6 cuts: 4\'-10 9/16" and 21\'-6 1/8"', cuts[0] === `4'-10 9/16"` && cuts[1] === `21'-6 1/8"`, cuts.join(', '));
+  check('ISO-6 cuts with 1/8" per fused end: 4\'-10 11/16" and 21\'-6 3/8"', cuts[0] === `4'-10 11/16"` && cuts[1] === `21'-6 3/8"`, cuts.join(', '));
   await key('Enter', 1, 300);
   check('Pinch marks a cut', (await g.locator('.row-btn.done').count()) === 1);
   await shot('08-cuts');
@@ -161,7 +159,7 @@ try {
   await key('ArrowLeft', 4);
   await key('ArrowDown', 1, 400);
   const info2 = await g.textContent('.info');
-  check('Selecting P1 shows its cut', info2.includes(`CUT 4'-10 9/16"`) && info2.includes('✓'), info2.slice(0, 80));
+  check('Selecting P1 shows its cut', info2.includes(`CUT 4'-10 11/16"`) && info2.includes('✓'), info2.slice(0, 80));
   await key('Enter', 1, 400);
   check('Pinch opens the part details', (await g.locator('.modal').count()) === 1 && (await g.textContent('.modal')).includes('Centre to centre'));
   await shot('11-detail');
@@ -188,7 +186,7 @@ try {
   await key('ArrowRight');
   await key('ArrowDown');
   const ex = await g.locator('.row-big').allTextContents();
-  check('Worked example: 50\' between two 5" 90s = 49\'-2"', ex.includes(`49'-2"`), ex.join(', '));
+  check('Worked example: 50\' between two 5" 90s = 49\'-2" + 1/8" per fused end', ex.includes(`49'-2 1/4"`), ex.join(', '));
   await key('Escape', 1, 600);
 
   // Pair screen

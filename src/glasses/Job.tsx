@@ -29,7 +29,7 @@ interface StepReq {
   save: (v: number) => void;
 }
 
-const SRC: Record<string, string> = {printed: 'on drawing', library: 'your library', standard: 'B16.9 std', coordinates: 'from coords', elevations: 'from elevations', derived: 'from geometry', none: 'unknown'};
+const SRC: Record<string, string> = {printed: 'on drawing', library: 'your library', standard: 'catalog', coordinates: 'from coords', elevations: 'from elevations', derived: 'from geometry', none: 'unknown'};
 
 export default function Job({job, tab, setTab, onLeave}: {job: JobT; tab: Tab; setTab: (t: Tab) => void; onLeave: () => void}) {
   useStore(); // re-render on any change (progress, take-outs)

@@ -528,3 +528,8 @@ table {
   color: var(--muted);
   font-size: 12px;
 }
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

@@ -112,7 +112,7 @@ export function LibraryCard() {
   return (
     <div className="card">
       <h3>Fitting take-outs</h3>
-      <p className="muted small">Centre-to-end of your fittings, from the maker's sheet. Used when the drawing doesn't print one. Steel butt-weld fittings fall back to ASME B16.9 long-radius sizes.</p>
+      <p className="muted small">Centre-to-end of your fittings, from the maker's sheet. Used when the drawing doesn't print one. Without an entry here, HDPE 90s, 45s and tees use the GF Central Plastics molded DR11 catalog (6": 90 = 8 5/8", 45 = 8 1/2", tee = 9"), and steel uses ASME B16.9 long-radius.</p>
       {p.library.length ? (
         <table className="results lib">
           <tbody>
@@ -139,8 +139,29 @@ export function LibraryCard() {
           </tbody>
         </table>
       ) : (
-        <p className="muted">No fittings yet.</p>
+        <p className="muted">No fittings yet: the catalog values are used.</p>
       )}
+      <div className="presets">
+        <button
+          className="btn small"
+          onClick={() => {
+            const mine: TakeoutEntry[] = [
+              {id: 'elbow90-6-hdpe', type: 'elbow90', size: 6, material: 'hdpe', takeout: 36, branch: null, laying: null, note: 'Field number (unverified)'},
+              {id: 'elbow45-6-hdpe', type: 'elbow45', size: 6, material: 'hdpe', takeout: 30, branch: null, laying: null, note: 'Field number (unverified)'},
+            ];
+            setPrefs({library: [...mine, ...getPrefs().library.filter(e => !mine.some(m => m.type === e.type && m.size === e.size && m.material === e.material))]});
+          }}
+        >
+          Try 6" 90 = 3'-0", 45 = 2'-6"
+        </button>
+        <button
+          className="btn small"
+          disabled={!p.library.length}
+          onClick={() => setPrefs({library: []})}
+        >
+          Back to catalog values
+        </button>
+      </div>
       <div className="grid2" key={k}>
         <label>
           Fitting

@@ -27,10 +27,17 @@ cut = centre-to-centre − take-out at each end − in-line fitting bodies
 ```
 
 Rounded to the nearest 1/16". Take-outs come from the drawing first, then your own library
-(phone Setup, or set on the glasses), then ASME B16.9 long-radius sizes for steel. HDPE molded
-fittings vary by maker, so FitUp never guesses them: it asks, and if only one is missing it
-suggests the value that makes the pipe add up to the BOM total. Every result is cross-checked
-against printed pipe lengths, coordinates and the bill of materials.
+(phone Setup, or set on the glasses), then catalog values:
+
+- **HDPE:** GF Central Plastics molded butt-fusion fittings, IPS DR11, 2"–12" 90s, 45s and equal
+  tees (6": 90 = 8 5/8", 45 = 8 1/2", tee = 9"). The sample sheet -6 adds up to its bill of
+  materials to the 1/16" with these. Other makers differ (Integrifuse 6" 90 = 9.06", 45 = 6.89"),
+  so check the fittings on your job. Laterals, reducers, caps and adapters come from the drawing
+  or your library.
+- **Steel:** ASME B16.9 long-radius.
+
+If only one take-out is missing, FitUp suggests the value that makes the pipe add up to the BOM
+total. Every result is cross-checked against printed pipe lengths, coordinates and the BOM.
 
 ## Database rules
 

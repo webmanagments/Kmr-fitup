@@ -1,6 +1,6 @@
 // node --experimental-strip-types tools/test-core.ts
 import assert from 'node:assert/strict';
-import {DEFAULT_SETTINGS, type TakeoutEntry} from '../src/core/library.ts';
+import {DEFAULT_SETTINGS, lookup, type TakeoutEntry} from '../src/core/library.ts';
 import {EXAMPLE, SHEET_2, SHEET_3, SHEET_6} from '../src/core/samples.ts';
 import {parseDirection, solve} from '../src/core/solve.ts';
 import {formatLength, parseLength, parseSize} from '../src/core/units.ts';
@@ -82,28 +82,46 @@ t('sheet -3: lateral wye, pipe 19\'-9 5/16" matches the print, BOM flagged', () 
   assert.ok(Math.abs(w.x / 12 - 1085.86) < 0.01);
   assert.match(r.welds.find(x => x.number === '1146')!.joins, /wye.*↔ sheet ISO-6/);
 });
-t('sheet -6: needs the elbow take-outs, then adds up', () => {
+t('sheet -6: catalog molded take-outs add up to its BOM to the 1/16"', () => {
   const r = solve(SHEET_6);
-  assert.ok(!r.ready);
-  assert.equal(r.checks.filter(c => c.level === 'error' && /take-out/.test(c.text)).length, 2);
+  assert.ok(r.ready, JSON.stringify(r.checks));
   assert.equal(formatLength(r.pieces[0].cc), `5'-7 3/16"`);
   const e2 = r.points.find(p => p.id === 'E2')!.pos!;
   assert.ok(Math.abs(e2.y / 12 - 1223.8125) < 0.001);
-  // Only the 90 unknown: the BOM total suggests a value for it.
-  const lib45: TakeoutEntry[] = [{id: 'a', type: 'elbow45', size: 6, material: 'hdpe', takeout: 8.5}];
-  const h = solve(SHEET_6, DEFAULT_SETTINGS, lib45);
-  const hint = h.checks.find(c => c.level === 'info' && /If the 6" 90° elbow take-out is/.test(c.text));
-  assert.ok(hint, JSON.stringify(h.checks));
+  assert.deepEqual(r.pieces.map(p => formatLength(p.cut)), [`4'-10 9/16"`, `21'-6 1/8"`, '—']);
+  assert.equal(r.pieces[2].status, 'nopipe'); // the 45 fuses straight onto the -3 wye
+  assert.equal(r.pieces[0].deductions[0].source, 'standard');
+  assert.equal(r.pieces[0].deductions[0].inches, 8.625);
+  assert.equal(r.pieces[1].deductions[1].inches, 8.5);
+  assert.ok(r.checks.some(c => c.level === 'ok' && /matches the BOM \(26'-4 11\/16"\)/.test(c.text)), JSON.stringify(r.checks));
+  // 3' / 2'-6" take-outs can't fit: the 45 sits 8 1/2" from the wye, and the pipe falls 6'+ short of the BOM.
+  const field: TakeoutEntry[] = [
+    {id: 'a', type: 'elbow90', size: 6, material: 'hdpe', takeout: 36},
+    {id: 'b', type: 'elbow45', size: 6, material: 'hdpe', takeout: 30},
+  ];
+  const f = solve(SHEET_6, DEFAULT_SETTINGS, field);
+  assert.ok(!f.ready);
+  assert.equal(f.pieces[2].status, 'negative');
+  assert.equal(f.pieces[0].deductions[0].source, 'library');
+});
+t('one unknown take-out: the BOM total suggests it', () => {
+  const s = structuredClone(SHEET_6);
+  s.fittings[0].type = 'elbow22'; // no catalog value
+  const h = solve(s);
+  assert.ok(h.checks.find(c => c.level === 'info' && /If the 6" 22½° elbow take-out is 8 5\/8"/.test(c.text)), JSON.stringify(h.checks));
   assert.equal(h.missing.length, 1);
   assert.equal(h.missing[0].suggest, 8.625);
   assert.equal(h.missing[0].field, 'takeout');
-  // Both known: every piece cuts, the 45 runs straight into the -3 wye with no pipe.
-  const lib = [...lib45, {id: 'b', type: 'elbow90', size: 6, material: 'hdpe', takeout: 8.625} as TakeoutEntry];
-  const k = solve(SHEET_6, DEFAULT_SETTINGS, lib);
-  assert.ok(k.ready);
-  assert.equal(k.pieces[2].status, 'nopipe');
-  assert.equal(k.pieces[0].deductions[0].source, 'library');
-  assert.ok(k.checks.some(c => /matches the BOM/.test(c.text)), JSON.stringify(k.checks));
+});
+t('HDPE catalog covers 2"-12" 90s, 45s and tees', () => {
+  const lk = (type: any, size: number) => lookup([], type, size, 'hdpe')?.entry;
+  assert.equal(lk('elbow90', 6)!.takeout, 8.625);
+  assert.equal(lk('elbow45', 6)!.takeout, 8.5);
+  assert.equal(lk('tee', 6)!.takeout, 9);
+  assert.equal(lk('tee', 6)!.branch, 9);
+  assert.equal(lk('elbow90', 12)!.takeout, 15.25);
+  assert.equal(lk('lateral', 6), undefined);
+  assert.equal(lookup([{id: 'x', type: 'elbow90', size: 6, material: 'hdpe', takeout: 9}], 'elbow90', 6, 'hdpe')!.source, 'library');
 });
 t('sheet -2: geometry from elevations and the wye branch', () => {
   const r = solve(SHEET_2);
@@ -122,7 +140,8 @@ t('bad data is reported, never silently fixed', () => {
   assert.ok(!r.ready);
   const s2 = structuredClone(EXAMPLE);
   s2.fittings[0].takeout = null;
-  assert.ok(solve(s2).checks.some(c => c.level === 'error' && /90° elbow/.test(c.text)));
+  s2.fittings[0].type = 'elbow22';
+  assert.ok(solve(s2).checks.some(c => c.level === 'error' && /22½° elbow/.test(c.text)));
   const s3 = structuredClone(EXAMPLE);
   s3.legs[0].to = 'ZZ';
   assert.ok(solve(s3).checks.some(c => c.level === 'error' && /isn't on the sheet/.test(c.text)));

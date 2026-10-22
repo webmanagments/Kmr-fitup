@@ -65,6 +65,7 @@ export interface Port {
   takeout: number | null;
   source: Source;
   branch: boolean;
+  role: 'takeout' | 'branch' | 'outlet';
 }
 
 export interface SFitting {
@@ -117,7 +118,8 @@ export interface Missing {
   label: string; // '6" 90° elbow'
   type: FittingType;
   size: number | null;
-  field: 'takeout' | 'branch' | 'laying';
+  field: 'takeout' | 'branch' | 'outlet' | 'laying';
+  size2?: number | null; // reducer small end
   ports: number;
   suggest?: number; // the value that makes the pipe add up to the BOM total
 }
@@ -167,6 +169,15 @@ export const materialOf = (sheet: Sheet): Material => (sheet.joining === 'butt_f
 function fittingSize(f: Fitting, sheet: Sheet): number | null {
   const s = f.size ? parseSize(f.size.split(/x|×/i)[0]) : null;
   return s ?? parseSize(sheet.size);
+}
+/** The small end of a reducing fitting ("6\" x 4\"" → 4), if given. */
+function fittingSize2(f: Fitting): number | null {
+  const parts = f.size?.split(/x|×/i) ?? [];
+  return parts.length > 1 ? parseSize(parts[1]) : null;
+}
+function sizeLabel(f: Fitting, sz: number | null): string {
+  const s2 = fittingSize2(f);
+  return sz ? (s2 && s2 !== sz ? `${sz}" x ${s2}" ` : `${sz}" `) : '';
 }
 
 export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: TakeoutEntry[] = []): Solution {
@@ -252,28 +263,40 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
   const missingTakeouts = new Map<string, Missing>(); // "elbow90|6" → count
   for (const f of sheet.fittings) {
     const sz = fittingSize(f, sheet);
-    const found = lookup(lib, f.type, sz, material);
+    const found = lookup(lib, f.type, sz, material, fittingSize2(f));
     const ports: Port[] = [];
     const legsHere = f.point ? sheet.legs.filter(l => l.from === f.point || l.to === f.point) : [];
+    // A lateral's two run ends differ: the heel (the side the branch leans towards) is long, the
+    // outlet short. Tell them apart from the geometry.
+    const centre = f.point ? pos.get(f.point) : undefined;
+    const farEnd = (l: Leg) => pos.get(l.from === f.point ? l.to : l.from);
+    const branchLeg = f.branchLeg ? legById.get(f.branchLeg) : undefined;
+    const branchDir = centre && branchLeg && farEnd(branchLeg) ? norm(sub(farEnd(branchLeg)!, centre)) : null;
     for (const l of legsHere) {
       const branch = !!f.branchLeg && f.branchLeg === l.id;
+      let role: Port['role'] = branch ? 'branch' : 'takeout';
+      if (!branch && f.type === 'lateral' && branchDir && centre && farEnd(l)) {
+        const d = norm(sub(farEnd(l)!, centre));
+        if (d && d.x * branchDir.x + d.y * branchDir.y + d.z * branchDir.z < 0) role = 'outlet';
+      }
       const printed = parseLength(f.takeouts?.[l.id] ?? (branch ? f.branchTakeout : f.takeout));
       let takeout: number | null = printed;
       let source: Source = printed !== null ? 'printed' : 'none';
       if (takeout === null && found) {
-        const t = branch ? (found.entry.branch ?? null) : found.entry.takeout;
-        if (t !== null) {
+        const e = found.entry;
+        const t = role === 'branch' ? (e.branch ?? null) : role === 'outlet' ? (e.outlet ?? e.takeout) : e.takeout;
+        if (t !== null && t !== undefined) {
           takeout = t;
           source = found.source;
         }
       }
       if (takeout === null) {
-        const key = `${f.type}|${sz ?? '?'}${branch ? '|branch' : ''}`;
-        const m = missingTakeouts.get(key) ?? {label: `${sz ? `${sz}" ` : ''}${FITTING_NAME[f.type]}${branch ? ' (branch)' : ''}`, type: f.type, size: sz, field: branch ? 'branch' : 'takeout', ports: 0};
+        const key = `${f.type}|${sz ?? '?'}|${role}`;
+        const m = missingTakeouts.get(key) ?? {label: `${sizeLabel(f, sz)}${FITTING_NAME[f.type]}${role === 'branch' ? ' (branch)' : role === 'outlet' ? ' (outlet)' : ''}`, type: f.type, size: sz, size2: fittingSize2(f), field: role, ports: 0};
         m.ports++;
         missingTakeouts.set(key, m);
       }
-      ports.push({leg: l.id, takeout, source, branch});
+      ports.push({leg: l.id, takeout, source, branch, role});
     }
     let fp: Vec | null = f.point ? (pos.get(f.point) ?? null) : null;
     if (!fp && f.inlineLeg) {
@@ -287,7 +310,7 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
         fp = f.inlineAt === 'to' && d ? sub(b, mul(d, half)) : d ? add(a, mul(d, half)) : a;
       }
     }
-    const sf: SFitting = {id: f.id, name: `${sz ? `${sz}" ` : ''}${FITTING_NAME[f.type]}${f.bomItem ? ` (item ${f.bomItem})` : ''}`, fitting: f, pos: fp, ports, welds: []};
+    const sf: SFitting = {id: f.id, name: `${sizeLabel(f, sz)}${FITTING_NAME[f.type]}${f.bomItem ? ` (item ${f.bomItem})` : ''}`, fitting: f, pos: fp, ports, welds: []};
     fittings.push(sf);
     if (f.point) fitAt.set(f.point, sf);
   }
@@ -338,13 +361,13 @@ export function solve(sheet: Sheet, settings: Settings = DEFAULT_SETTINGS, lib: 
       if (inline) {
         const sf = fittings.find(x => x.id === inline.id)!;
         const sz = fittingSize(inline, sheet);
-        const found = lookup(lib, inline.type, sz, material);
+        const found = lookup(lib, inline.type, sz, material, fittingSize2(inline));
         const printed = parseLength(inline.laying);
         const lay = printed ?? found?.entry.laying ?? null;
         deductions.push({label: `${sf.name} body`, inches: lay, source: printed !== null ? 'printed' : lay !== null ? found!.source : 'none'});
         if (lay === null) {
           const key = `${inline.type}|${sz ?? '?'}|laying`;
-          const mm = missingTakeouts.get(key) ?? {label: `${sz ? `${sz}" ` : ''}${FITTING_NAME[inline.type]} (end-to-end)`, type: inline.type, size: sz, field: 'laying', ports: 0};
+          const mm = missingTakeouts.get(key) ?? {label: `${sizeLabel(inline, sz)}${FITTING_NAME[inline.type]}`, type: inline.type, size: sz, size2: fittingSize2(inline), field: 'laying', ports: 0};
           mm.ports++;
           missingTakeouts.set(key, mm);
         }

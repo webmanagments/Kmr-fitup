@@ -14,10 +14,14 @@ interface Props<T> {
   className?: string;
   autofocus?: boolean;
   onPage?: (page: number) => void;
+  startKey?: string | null; // open on the page holding this item
 }
 
-export default function Paged<T>({items, perPage, row, keyOf, empty, className, autofocus, onPage}: Props<T>) {
-  const [page, setPage] = useState(0);
+export default function Paged<T>({items, perPage, row, keyOf, empty, className, autofocus, onPage, startKey}: Props<T>) {
+  const [page, setPage] = useState(() => {
+    const i = startKey ? items.findIndex(it => keyOf(it) === startKey) : -1;
+    return i > 0 ? Math.floor(i / perPage) : 0;
+  });
   const pages = Math.max(1, Math.ceil(items.length / perPage));
   const box = useRef<HTMLDivElement>(null);
   const want = useRef<'first' | 'last' | null>(null);

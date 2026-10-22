@@ -12,6 +12,7 @@ import Review from './Review.tsx';
 import {KeyCard, LibraryCard, ShopCard} from './Setup.tsx';
 
 type Busy = null | 'reading' | 'sending';
+const MAX_PHOTOS = 8;
 
 export default function App() {
   const p = usePrefs();
@@ -38,14 +39,14 @@ export default function App() {
   const addFiles = async (files: FileList | null) => {
     if (!files?.length) return;
     const loaded: Photo[] = [];
-    for (const f of [...files].slice(0, 4)) {
+    for (const f of [...files].slice(0, MAX_PHOTOS)) {
       try {
         loaded.push(await loadPhoto(f));
       } catch {
         setMsg({kind: 'err', text: `Couldn't open ${f.name}.`});
       }
     }
-    setPhotos(ps => [...ps, ...loaded].slice(0, 4));
+    setPhotos(ps => [...ps, ...loaded].slice(0, MAX_PHOTOS));
   };
 
   const read = async (list: Photo[] = photos, extra = '') => {
@@ -84,7 +85,7 @@ export default function App() {
   const gotLivePhoto = (photo: Photo) => {
     const closeUp = live?.closeUp ?? false;
     setLive(null);
-    const list = (closeUp ? [...photos, photo] : [photo, ...photos]).slice(0, 4);
+    const list = (closeUp ? [...photos, photo] : [photo, ...photos]).slice(0, MAX_PHOTOS);
     setPhotos(list);
     if (!getPrefs().apiKey) {
       setMsg({kind: 'info', text: 'Got the photo. Add your Anthropic API key in Setup to read it.'});
@@ -179,7 +180,7 @@ export default function App() {
           {!sheet && (
             <div className="card">
               <h3>1. Photograph the sheet</h3>
-              <p className="muted small">Flat, square-on and in good light, the whole sheet in frame. Add up to 3 close-ups of small numbers or the bill of materials.</p>
+              <p className="muted small">Flat, square-on and in good light. One photo of the whole sheet, or several of its parts (drawing, title block, bill of materials, close-ups of busy spots): up to 8 photos, all read together as one sheet.</p>
               <div className="photos">
                 {photos.map(ph => (
                   <div className="ph" key={ph.id}>
@@ -195,14 +196,14 @@ export default function App() {
                   </div>
                 ))}
               </div>
-              <button className="btn primary wide live-btn" onClick={() => setLive({closeUp: false})} disabled={photos.length >= 4 || busy === 'reading'}>
+              <button className="btn primary wide live-btn" onClick={() => setLive({closeUp: false})} disabled={photos.length >= MAX_PHOTOS || busy === 'reading'}>
                 Live scan <small>takes the photo and reads it by itself</small>
               </button>
               <div className="row">
-                <button className="btn" onClick={() => camera.current?.click()} disabled={photos.length >= 4}>
+                <button className="btn" onClick={() => camera.current?.click()} disabled={photos.length >= MAX_PHOTOS}>
                   Take photo
                 </button>
-                <button className="btn" onClick={() => gallery.current?.click()} disabled={photos.length >= 4}>
+                <button className="btn" onClick={() => gallery.current?.click()} disabled={photos.length >= MAX_PHOTOS}>
                   Choose photos
                 </button>
               </div>
@@ -265,7 +266,7 @@ export default function App() {
             </div>
           )}
 
-          {sheet && busy !== 'reading' && !!sheet.unreadable?.length && photos.length > 0 && photos.length < 4 && (
+          {sheet && busy !== 'reading' && !!sheet.unreadable?.length && photos.length > 0 && photos.length < MAX_PHOTOS && (
             <div className="card improve">
               <h3>Claude couldn't read {sheet.unreadable.length === 1 ? 'one thing' : `${sheet.unreadable.length} things`}</h3>
               <ul>

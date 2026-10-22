@@ -127,6 +127,97 @@ export const SHEET_2: Sheet = {
   confidence: 'medium',
 };
 
+const common2 = {...common, line: 'DEMO-L-0002'};
+const REDUCER = 'IPS SDR 11 CONCENTRIC REDUCER, FUSION WELD, PE4710, ASTM D3350, ASTM D3261';
+
+/**
+ * Sheet -13: a cleanout riser, a rolled 45 offset fused straight onto a lateral wye, and a long
+ * sloped run. Every fitting fuses to the next with no pipe between, so only two pipes are cut:
+ * 2'-0" up the riser and 23'-3 5/16" along the run (25'-3 5/16" total, the BOM figure).
+ */
+export const SHEET_13: Sheet = {
+  drawing: {...common2, number: 'DEMO-ISO-13'},
+  size: '6"',
+  material: HDPE,
+  joining: 'butt_fusion',
+  points: [
+    {id: 'CO', kind: 'end', e: 744.56, n: 1219.8, el: 357, label: 'Cleanout CO1'},
+    {id: 'E1', kind: 'center', el: 353.03},
+    {id: 'E2', kind: 'center', el: 352.02},
+    {id: 'W', kind: 'center', el: 352.01, label: 'Lateral wye'},
+    {id: 'B', kind: 'end', e: 742.25, n: 1221.41, el: 352.02, label: 'Cont. on -14', cont: 'DEMO-ISO-14'},
+    {id: 'A', kind: 'end', e: 717.36, n: 1219.8, el: 351.88, label: 'Cont. on -12', cont: 'DEMO-ISO-12'},
+  ],
+  legs: [
+    {id: 'L1', from: 'CO', to: 'E1', direction: 'Down', cc: `3'-11 5/8"`, bomItem: 1},
+    {id: 'L2', from: 'E1', to: 'E2', direction: 'W 45 Down', cc: `1'-5"`},
+    {id: 'L3', from: 'E2', to: 'W', direction: 'W', cc: `2'-11 3/16"`},
+    {id: 'L4', from: 'W', to: 'A', direction: 'W', cc: `23'-3 5/16"`, slope: '0.5%', bomItem: 1},
+    {id: 'L5', from: 'W', to: 'B', direction: 'N45E', cc: `2'-3 3/8"`},
+  ],
+  fittings: [
+    {id: 'F1', type: 'cleanout', bomItem: 4, inlineLeg: 'L1', inlineAt: 'from', size: '6"', note: 'Cleanout CO1, see typical details'},
+    {id: 'F2', type: 'elbow45', bomItem: 3, point: 'E1', size: '6"'},
+    {id: 'F3', type: 'elbow45', bomItem: 3, point: 'E2', size: '6"'},
+    {id: 'F4', type: 'lateral', bomItem: 2, point: 'W', angle: 45, size: '6" x 6"', branchLeg: 'L5'},
+  ],
+  welds: [
+    {number: '1468', point: 'A', type: 'FW'},
+    {number: '1469', point: 'W', leg: 'L4', type: 'FW'},
+    {number: '1470', point: 'B', type: 'FW'},
+    {number: '1471', point: 'W', leg: 'L3', type: 'FW'},
+    {number: '1472', point: 'E1', leg: 'L2', type: 'FW'},
+    {number: '1473', point: 'E1', leg: 'L1', type: 'FW'},
+  ],
+  bom: [
+    {item: 1, size1: '6"', description: PIPE, qty: `25'-3 5/16"`, spec: null},
+    {item: 2, size1: '6"', size2: '6"', description: WYE, qty: '1', spec: null},
+    {item: 3, size1: '6"', description: ELL45, qty: '2', spec: null},
+    {item: 4, size1: '6"', description: 'Cleanout - See Typical Details', qty: '1', spec: null},
+  ],
+  confidence: 'high',
+};
+
+/**
+ * Sheet -11 (4"): a drop from a floor drain, a 90, a long sloped run, then a 45 fused straight onto
+ * a 6" x 4" reducer at the sheet break. Pipe: 5'-6 1/2" + 18'-7 1/2" = 24'-2" (the BOM figure).
+ */
+export const SHEET_11: Sheet = {
+  drawing: {...common2, number: 'DEMO-ISO-11'},
+  size: '4"',
+  material: '4" IPS SDR 11 HDPE PE4710',
+  joining: 'butt_fusion',
+  points: [
+    {id: 'T', kind: 'end', e: 644.25, n: 1242, el: 357.67, label: 'Floor drain BU TYPE A'},
+    {id: 'E1', kind: 'center', el: 351.6},
+    {id: 'E2', kind: 'center', el: 351.5},
+    {id: 'A', kind: 'end', e: 643.34, n: 1221.41, el: 351.5, label: 'Cont. on -10', cont: 'DEMO-ISO-10'},
+  ],
+  legs: [
+    {id: 'L1', from: 'T', to: 'E1', direction: 'Down', cc: `6'-0 7/8"`, bomItem: 1},
+    {id: 'L2', from: 'E1', to: 'E2', direction: 'S', cc: `19'-8 1/8"`, slope: '0.5%', bomItem: 1},
+    {id: 'L3', from: 'E2', to: 'A', direction: 'S45W', cc: `1'-3 1/2"`},
+  ],
+  fittings: [
+    {id: 'F1', type: 'elbow90', bomItem: 3, point: 'E1', size: '4"'},
+    {id: 'F2', type: 'elbow45', bomItem: 4, point: 'E2', size: '4"'},
+    {id: 'F3', type: 'reducer', bomItem: 2, inlineLeg: 'L3', inlineAt: 'to', size: '6" x 4"', note: 'Concentric, 6" end at the sheet break'},
+  ],
+  welds: [
+    {number: '1464', point: 'E1', leg: 'L1', type: 'FW'},
+    {number: '1463', point: 'E1', leg: 'L2', type: 'FW'},
+    {number: '1462', point: 'E2', leg: 'L2', type: 'FW'},
+    {number: '1461', point: 'E2', leg: 'L3', type: 'FW'},
+  ],
+  bom: [
+    {item: 1, size1: '4"', description: PIPE, qty: `24'-2"`, spec: null},
+    {item: 2, size1: '6"', size2: '4"', description: REDUCER, qty: '1', spec: null},
+    {item: 3, size1: '4"', description: ELL90, qty: '1', spec: null},
+    {item: 4, size1: '4"', description: ELL45, qty: '1', spec: null},
+  ],
+  confidence: 'high',
+};
+
 /** The worked example: a 50' run between two 90s that take out 5" each, rising 8'-2" at the end. */
 export const EXAMPLE: Sheet = {
   drawing: {number: 'EXAMPLE-1', title: 'Worked example: 50\' run, two 90s', notes: ['Not a real drawing.']},
@@ -158,4 +249,4 @@ export const EXAMPLE: Sheet = {
   confidence: 'high',
 };
 
-export const SAMPLES: Sheet[] = [SHEET_6, SHEET_3, SHEET_2, EXAMPLE];
+export const SAMPLES: Sheet[] = [SHEET_13, SHEET_11, SHEET_6, SHEET_3, SHEET_2, EXAMPLE];

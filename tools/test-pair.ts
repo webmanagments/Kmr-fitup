@@ -65,7 +65,8 @@ try {
   assert.deepEqual(readingFrom({content: [{type: 'text', text: 'Here:\n```json\n{"points": [], "legs": [1]}\n```'}]}), {points: [], legs: [1]});
   assert.equal(readingFrom({content: [{type: 'text', text: 'I cannot read this.'}]}), null);
   assert.equal((req.messages[0].content as any[]).length, 3);
-  assert.match(JSON.stringify(req), /same sheet/);
+  assert.match(JSON.stringify(req), /all of ONE sheet/);
+  assert.match(req.system, /EXAMPLE of a correct reading/);
   console.log('ok reader cleanup and request');
   console.log('\nall passed');
 } finally {

@@ -60,13 +60,13 @@ export default function Job({job, tab, setTab, onLeave}: {job: JobT; tab: Tab; s
 
   const fix = (m: Missing) => {
     const size = m.size ?? sol.size ?? 6;
-    const existing = lookup(libraryFor(job), m.type, size, sol.material)?.entry ?? null;
-    const what = m.field === 'branch' ? 'branch, centre to end' : m.field === 'laying' ? 'end-to-end length' : 'centre to end';
+    const existing = lookup(libraryFor(job), m.type, size, sol.material, m.size2)?.entry ?? null;
+    const what = m.field === 'branch' ? 'branch, centre to end' : m.field === 'outlet' ? 'outlet, centre to end' : m.field === 'laying' ? 'end-to-end length' : 'centre to end';
     setStep({
-      title: `${m.label.replace(' (branch)', '').replace(' (end-to-end)', '')} ${what}`,
+      title: `${m.label.replace(/ \((branch|outlet)\)$/, '')} ${what}`,
       start: m.suggest ?? (m.field === 'laying' ? size : m.type === 'elbow90' ? size * 1.5 : size),
       note: m.suggest ? `Starts at ${formatLength(m.suggest)}: the value that matches the BOM. Check it against your fitting sheet.` : 'From the centre of the fitting (where the centrelines cross) to the face the pipe fuses to. Both fittings on a pipe add up to its take-out.',
-      save: v => setTakeout(m.type, size, sol.material, m.field, v, existing),
+      save: v => setTakeout(m.type, size, sol.material, m.field, v, existing, m.size2),
     });
   };
   const fixAllowance = () =>
@@ -182,7 +182,7 @@ function PartInfo({job, sol, part, done, fused}: {job: JobT; sol: Solution; part
         <b className="chip amber">{f.fitting.bomItem ? `#${f.fitting.bomItem}` : 'FIT'}</b>
         <b className="info-name">{f.name.replace(/ \(item \d+\)$/, '')}</b>
       </div>
-      <p className="big amber">{f.ports.length ? f.ports.map(pt => formatLength(pt.takeout)).join(' / ') : FITTING_NAME[f.fitting.type]}</p>
+      <p className="big amber">{f.ports.length ? f.ports.map(pt => formatLength(pt.takeout)).join(' / ') : bodyOf(sol, f) !== null ? `${formatLength(bodyOf(sol, f))} long` : FITTING_NAME[f.fitting.type]}</p>
       <p className="muted">{f.ports.length ? f.ports.map(pt => `${pt.branch ? 'branch' : 'run'} ${SRC[pt.source]}`).join(' · ') : (f.fitting.note ?? '')}</p>
       <p className="muted">{f.welds.length ? `Joints ${f.welds.map(w => (fused.has(w) ? `${w}✓` : w)).join(' · ')}` : ''}</p>
     </div>
@@ -261,11 +261,11 @@ function PartDetail({job, sol, part, done, fused, fix, close}: {job: JobT; sol: 
   const ms = sol.missing.filter(m => m.type === f.fitting.type);
   return (
     <Modal title={f.name} onClose={close} wide>
-      <FittingLines f={f} />
+      <FittingLines f={f} sol={sol} />
       <div className="row">
         {ms.map(m => (
           <button key={m.field} className="btn primary" data-autofocus onClick={() => fix(m)}>
-            Set {m.field === 'branch' ? 'branch size' : m.field === 'laying' ? 'length' : 'size'}
+            Set {m.field === 'branch' ? 'branch size' : m.field === 'outlet' ? 'outlet size' : m.field === 'laying' ? 'length' : 'size'}
           </button>
         ))}
         {!ms.length && f.ports.length > 0 && f.ports.every(p => p.source !== 'printed') && (
@@ -281,12 +281,24 @@ function PartDetail({job, sol, part, done, fused, fix, close}: {job: JobT; sol: 
   );
 }
 
-function FittingLines({f}: {f: SFitting}) {
+/** An in-line fitting's length (cleanout, reducer, coupling) as used in the cut. */
+function bodyOf(sol: Solution, f: SFitting): number | null {
+  for (const p of sol.pieces) for (const d of p.deductions) if (d.label === `${f.name} body` && d.inches !== null) return d.inches;
+  return null;
+}
+
+function FittingLines({f, sol}: {f: SFitting; sol: Solution}) {
+  const body = f.ports.length ? null : bodyOf(sol, f);
   return (
     <ul className="lines">
+      {body !== null && (
+        <li>
+          Length <b>{formatLength(body)}</b>
+        </li>
+      )}
       {f.ports.map((pt, i) => (
         <li key={i}>
-          {pt.branch ? 'Branch' : 'Run'} centre to end <b className={pt.takeout === null ? 'red' : ''}>{formatLength(pt.takeout)}</b> <small>{SRC[pt.source]}</small>
+          {pt.branch ? 'Branch' : pt.role === 'outlet' ? 'Outlet' : f.fitting.type === 'lateral' ? 'Heel' : 'Run'} centre to end <b className={pt.takeout === null ? 'red' : ''}>{formatLength(pt.takeout)}</b> <small>{SRC[pt.source]}</small>
         </li>
       ))}
       {f.pos && (

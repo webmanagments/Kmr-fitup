@@ -79,10 +79,9 @@ try {
   await key('ArrowUp', 3);
   check('Up reaches the first sheet', (await focused()).startsWith('job-demo0'));
   await key('ArrowDown', 3);
-  check('Down past the last card turns the page', (await g.locator('.job-card').count()) === 1 && (await g.textContent('.pager b')) === '2/2');
+  check('Down past the last card turns the page', (await g.locator('.job-card').count()) === 3 && (await g.textContent('.pager b')) === '2/2');
   await key('ArrowUp');
-  check('Up from the first card on page 2 goes back', (await g.textContent('.pager b')) === '1/2');
-  await key('ArrowUp', 3);
+  check('Up from the first card on page 2 goes back', (await g.textContent('.pager b')) === '1/2' && (await focused()).startsWith('job-demo2'));
 
   // Open ISO-6
   await key('Enter', 1, 600);
@@ -168,8 +167,8 @@ try {
   check('Back closes the popup only', (await g.locator('.modal').count()) === 0 && (await g.locator('.tabs').count()) === 1);
   await key('Escape', 1, 600);
   check('Back again goes home', (await g.locator('.home').count()) === 1);
-  check('Home returns to the card used', (await focused()).startsWith('job-demo0'));
-  const sub = await g.textContent('.job-card');
+  check('Home returns to the card used', (await focused()).startsWith('job-demo2'));
+  const sub = await g.evaluate(() => document.activeElement?.textContent ?? '');
   check('Card shows progress', sub.includes('1/2 cut') && sub.includes('1/3 joints'), sub);
   await shot('12-home-progress');
   check('Overflowing text', (await overflow()).length === 0, (await overflow()).join(', '));
@@ -180,6 +179,7 @@ try {
   await key('ArrowRight', 2, 400);
   await shot('13-wye');
   await key('Escape', 1, 600);
+  check('Coming back from a page-2 sheet lands on page 2', (await g.textContent('.pager b')) === '2/2' && (await focused()).startsWith('job-demo3'), await focused());
   await key('ArrowDown', 2);
   await key('Enter', 1, 600);
   await key('ArrowUp');
@@ -194,7 +194,7 @@ try {
   check('Left on a card flips back a page', (await g.textContent('.pager b')) === '1/2');
   await key('ArrowRight');
   check('Right on a card flips forward', (await g.textContent('.pager b')) === '2/2');
-  await key('ArrowDown');
+  await key('ArrowDown', 3);
   check('Down from the last page reaches the buttons', ['pair', 'samples', 'settings'].includes(await focused()), await focused());
   await key('ArrowLeft', 2);
   check('Pair button', (await focused()) === 'pair');
@@ -221,7 +221,7 @@ try {
   check('Code is cleaned up as typed', (await ph.inputValue('.code-input')) === `${code.slice(0, 4)}-${code.slice(4)}`);
   await ph.click('text=Done');
   await ph.click('summary:has-text("sample")');
-  await ph.click('.samples .btn >> nth=1');
+  await ph.click('.samples .btn:text-is("ISO-3")');
   await ph.waitForTimeout(400);
   const pcuts = await ph.locator('.results .cut').allTextContents();
   check('Phone shows the -3 cut list', pcuts.includes(`19'-9 5/16"`), pcuts.join(', '));
@@ -233,7 +233,7 @@ try {
   check('Phone says sent', (await ph.textContent('.msg')).includes('Sent ISO-77'));
   shots && (await ph.screenshot({path: `${shots}/p-03-sent.png`}));
   const got = await g.waitForSelector('.toast:has-text("ISO-77")', {timeout: 9000}).then(() => true, () => false);
-  check('Glasses receive it', got && (await g.locator('.job-name:has-text("ISO-77")').count()) === 1);
+  check('Glasses receive it', got && (await g.evaluate(() => JSON.parse(localStorage.getItem('kmr.fitup.v1')).jobs.some(j => j.name === 'ISO-77'))));
   await shot('15-received');
 
   // Wide check for horizontal scroll on phone

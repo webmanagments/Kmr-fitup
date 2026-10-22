@@ -10,6 +10,8 @@ import {addJobs, clearLibrary, getState, newCode, progressOf, setOverride, solve
 import {DEFAULT_SETTINGS} from '../core/library.ts';
 
 export type Link = 'ok' | 'rules' | 'offline' | 'idle';
+/** The sheet last opened, so coming back lands on its page. */
+const lastOpened: {id: string | null} = {id: null};
 
 export function scanUrl(): string {
   const base = `${location.host}${location.pathname.replace(/[^/]*$/, '')}`;
@@ -68,7 +70,16 @@ export default function Home({open, go, link}: {open: (id: string) => void; go: 
           perPage={3}
           keyOf={j => j.id}
           autofocus
-          row={j => <JobCard job={j} open={() => open(j.id)} />}
+          startKey={lastOpened.id}
+          row={j => (
+            <JobCard
+              job={j}
+              open={() => {
+                lastOpened.id = j.id;
+                open(j.id);
+              }}
+            />
+          )}
           empty={
             <div className="empty-home">
               <p className="big">No sheets yet</p>

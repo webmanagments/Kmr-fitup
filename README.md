@@ -35,8 +35,11 @@ Rounded to the nearest 1/16". Take-outs come from the drawing first, then your o
 - **HDPE:** GF Central Plastics molded butt-fusion fittings, IPS DR11, 2"–12" 90s, 45s and equal
   tees (6": 90 = 8 5/8", 45 = 8 1/2", tee = 9"). The sample sheet -6 adds up to its bill of
   materials to the 1/16" with these. Other makers differ (Integrifuse 6" 90 = 9.06", 45 = 6.89"),
-  so check the fittings on your job. Laterals, reducers, caps and adapters come from the drawing
-  or your library.
+  so check the fittings on your job.
+- **From the B&V HDPE sheets** (each matches its bill of materials to the 1/16"): 6" x 6" molded
+  lateral wye = 2'-2 11/16" centre to heel, 0" to outlet, 2'-3 3/8" to branch (the centre is where
+  the branch meets the run); 6" cleanout CO1 = 15 1/8" from the top point to the fusion face;
+  6" x 4" concentric reducer = 9 1/4" end to end; floor drain hubs (BU … TYPE A) take nothing.
 - **Steel:** ASME B16.9 long-radius.
 
 If only one take-out is missing, FitUp suggests the value that makes the pipe add up to the BOM

@@ -56,7 +56,8 @@ export function formatLength(inches: number | null | undefined, den = 16): strin
     d /= 2;
   }
   const frac = num ? `${num}/${d}` : '';
-  const inch = whole && frac ? `${whole} ${frac}` : whole ? `${whole}` : frac || '0';
+  // With feet, always show the whole inches (6'-0 7/8", never 6'-7/8").
+  const inch = frac ? `${whole || feet ? `${whole} ` : ''}${frac}` : `${whole}`;
   const out = feet ? `${feet}'-${inch}"` : `${inch}"`;
   return neg ? `-${out}` : out;
 }

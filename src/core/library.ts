@@ -16,10 +16,12 @@ export type Material = 'hdpe' | 'steel';
 export interface TakeoutEntry {
   id: string;
   type: FittingType;
-  size: number; // nominal size, inches (6 = 6")
+  size: number; // nominal size, inches (6 = 6"); for a reducer, the big end
+  size2?: number | null; // reducer small end (6" x 4" → 4)
   material: Material;
   takeout: number | null; // centre-to-end, inches (run ports); null = not known
   branch?: number | null; // centre-to-end of the branch port (tees, wyes)
+  outlet?: number | null; // laterals: centre to the outlet end (the run end the branch points away from); null = same as takeout
   laying?: number | null; // end-to-end of an in-line fitting
   note?: string;
 }
@@ -64,13 +66,25 @@ const HDPE45: Record<string, number> = {'2': 3.5, '3': 5.3, '4': 6.25, '6': 8.5,
 const HDPETEE: Record<string, [number, number]> = {'2': [4.64, 4.5], '3': [5.88, 5.88], '4': [7.25, 7.25], '6': [9, 9], '8': [11.75, 11.75], '10': [13.38, 13.5], '12': [16, 15.88]};
 const sixteenth = (x: number) => Math.round(x * 16) / 16;
 
-export function builtIn(type: FittingType, size: number, material: Material): TakeoutEntry | null {
+// Fittings as modelled on the Black & Veatch HDPE isometrics (line 13WWD / 23WWD sheets). Worked
+// out from sheets whose pipe totals match their bills of materials to the 1/16":
+//  - 6" x 6" molded 45° lateral wye: centre (where the branch meets the run) to the heel end
+//    2'-2 11/16", to the outlet end 0, to the branch end 2'-3 3/8".
+//  - 6" cleanout (typical CO1): the top point to the face the pipe fuses to, 15 1/8".
+//  - 6" x 4" concentric reducer: 9 1/4" end to end.
+// A floor-drain hub end (BU … TYPE A) takes nothing: the pipe runs to the printed point.
+const SHEETS = 'From the B&V HDPE isometrics (matches their BOMs)';
+
+export function builtIn(type: FittingType, size: number, material: Material, size2?: number | null): TakeoutEntry | null {
   const k = String(size);
   if (material === 'hdpe') {
     const note = 'GF Central Plastics molded, IPS DR11 catalog';
     if (type === 'elbow90' && HDPE90[k]) return {id: `gf-90-${k}`, type, size, material, takeout: sixteenth(HDPE90[k]), note};
     if (type === 'elbow45' && HDPE45[k]) return {id: `gf-45-${k}`, type, size, material, takeout: sixteenth(HDPE45[k]), note};
     if (type === 'tee' && HDPETEE[k]) return {id: `gf-tee-${k}`, type, size, material, takeout: sixteenth(HDPETEE[k][0]), branch: sixteenth(HDPETEE[k][1]), note};
+    if (type === 'lateral' && size === 6) return {id: 'bv-lateral-6', type, size, material, takeout: 26.6875, outlet: 0, branch: 27.375, note: SHEETS};
+    if (type === 'cleanout' && size === 6) return {id: 'bv-cleanout-6', type, size, material, takeout: null, laying: 15.125, note: SHEETS};
+    if (type === 'reducer' && size === 6 && size2 === 4) return {id: 'bv-reducer-6x4', type, size, size2: 4, material, takeout: null, laying: 9.25, note: SHEETS};
     return null;
   }
   if (type === 'elbow90') return {id: `b16.9-90-${k}`, type, size, material, takeout: LR90(size), note: 'ASME B16.9 long-radius 90°'};
@@ -79,10 +93,11 @@ export function builtIn(type: FittingType, size: number, material: Material): Ta
   return null;
 }
 
-export function lookup(lib: TakeoutEntry[], type: FittingType, size: number | null, material: Material): {entry: TakeoutEntry; source: 'library' | 'standard'} | null {
+export function lookup(lib: TakeoutEntry[], type: FittingType, size: number | null, material: Material, size2?: number | null): {entry: TakeoutEntry; source: 'library' | 'standard'} | null {
   if (size === null) return null;
-  const mine = lib.find(e => e.type === type && Math.abs(e.size - size) < 1e-6 && e.material === material);
+  const same2 = (e: TakeoutEntry) => !e.size2 || !size2 || Math.abs(e.size2 - size2) < 1e-6;
+  const mine = lib.find(e => e.type === type && Math.abs(e.size - size) < 1e-6 && e.material === material && same2(e));
   if (mine) return {entry: mine, source: 'library'};
-  const std = builtIn(type, size, material);
+  const std = builtIn(type, size, material, size2);
   return std ? {entry: std, source: 'standard'} : null;
 }

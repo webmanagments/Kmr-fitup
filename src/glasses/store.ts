@@ -95,13 +95,24 @@ export function toggle(jobId: string, what: 'cut' | 'fused', key: string) {
   set({progress: {...state.progress, [jobId]: {...p, [what]: list}}});
 }
 
-export type TakeoutField = 'takeout' | 'branch' | 'laying';
+export type TakeoutField = 'takeout' | 'branch' | 'outlet' | 'laying';
 
 /** Save one value for a fitting (run take-out, branch take-out or in-line length). */
-export function setTakeout(type: TakeoutEntry['type'], size: number, material: TakeoutEntry['material'], field: TakeoutField, value: number, fallback?: TakeoutEntry | null) {
-  const same = (e: TakeoutEntry) => e.type === type && e.size === size && e.material === material;
+export function setTakeout(type: TakeoutEntry['type'], size: number, material: TakeoutEntry['material'], field: TakeoutField, value: number, fallback?: TakeoutEntry | null, size2?: number | null) {
+  const same = (e: TakeoutEntry) => e.type === type && e.size === size && e.material === material && (e.size2 ?? null) === (size2 ?? null);
   const prev = state.library.find(same) ?? (fallback ? {...fallback} : null);
-  const entry: TakeoutEntry = {id: `g-${type}-${size}-${material}`, type, size, material, takeout: prev?.takeout ?? null, branch: prev?.branch ?? null, laying: prev?.laying ?? null, note: 'Set on the glasses'};
+  const entry: TakeoutEntry = {
+    id: `g-${type}-${size}${size2 ? `x${size2}` : ''}-${material}`,
+    type,
+    size,
+    size2: size2 ?? null,
+    material,
+    takeout: prev?.takeout ?? null,
+    branch: prev?.branch ?? null,
+    outlet: prev?.outlet ?? null,
+    laying: prev?.laying ?? null,
+    note: 'Set on the glasses',
+  };
   entry[field] = value;
   set({library: [entry, ...state.library.filter(e => !same(e))]});
 }

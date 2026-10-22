@@ -1,7 +1,7 @@
 // node --experimental-strip-types tools/test-core.ts
 import assert from 'node:assert/strict';
 import {DEFAULT_SETTINGS, lookup, type TakeoutEntry} from '../src/core/library.ts';
-import {EXAMPLE, SHEET_2, SHEET_3, SHEET_6} from '../src/core/samples.ts';
+import {EXAMPLE, SHEET_11, SHEET_13, SHEET_2, SHEET_3, SHEET_6} from '../src/core/samples.ts';
 import {parseDirection, solve} from '../src/core/solve.ts';
 import {formatLength, parseLength, parseSize} from '../src/core/units.ts';
 
@@ -34,6 +34,10 @@ t('format lengths', () => {
   assert.equal(formatLength(0.03), '0"');
   assert.equal(formatLength(-0.25), '-1/4"');
   assert.equal(formatLength(237.31), `19'-9 5/16"`);
+  assert.equal(formatLength(72.875), `6'-0 7/8"`);
+  assert.equal(formatLength(12.625), `1'-0 5/8"`);
+  assert.equal(formatLength(0.625), '5/8"');
+  assert.equal(formatLength(24), `2'-0"`);
 });
 t('directions', () => {
   const near = (a: any, b: number[]) => assert.ok(Math.abs(a.x - b[0]) + Math.abs(a.y - b[1]) + Math.abs(a.z - b[2]) < 1e-6, JSON.stringify(a));
@@ -122,15 +126,45 @@ t('HDPE catalog covers 2"-12" 90s, 45s and tees', () => {
   assert.equal(lk('tee', 6)!.takeout, 9);
   assert.equal(lk('tee', 6)!.branch, 9);
   assert.equal(lk('elbow90', 12)!.takeout, 15.25);
-  assert.equal(lk('lateral', 6), undefined);
+  assert.deepEqual([lk('lateral', 6)!.takeout, lk('lateral', 6)!.outlet, lk('lateral', 6)!.branch], [26.6875, 0, 27.375]);
+  assert.equal(lk('cleanout', 6)!.laying, 15.125);
+  assert.equal(lookup([], 'reducer', 6, 'hdpe', 4)!.entry.laying, 9.25);
+  assert.equal(lookup([], 'reducer', 6, 'hdpe', 3), null);
   assert.equal(lookup([{id: 'x', type: 'elbow90', size: 6, material: 'hdpe', takeout: 9}], 'elbow90', 6, 'hdpe')!.source, 'library');
+});
+t('sheet -13: cleanout riser, rolled 45s and lateral add up to the BOM (25\'-3 5/16")', () => {
+  const r = solve(SHEET_13);
+  assert.ok(r.ready, JSON.stringify(r.checks));
+  const cut = r.pieces.filter(p => p.status === 'ok').map(p => formatLength(p.cut));
+  assert.deepEqual(cut, [`2'-0"`, `23'-3 5/16"`]);
+  assert.deepEqual(r.pieces.map(p => p.status), ['ok', 'nopipe', 'nopipe', 'ok', 'nopipe']);
+  assert.ok(r.checks.some(c => c.level === 'ok' && /matches the BOM \(25'-3 5\/16"\)/.test(c.text)));
+  const wye = r.fittings.find(f => f.fitting.type === 'lateral')!;
+  assert.deepEqual(wye.ports.map(p => [p.role, p.takeout]), [['takeout', 26.6875], ['outlet', 0], ['branch', 27.375]]);
+  const w = Object.fromEntries(r.welds.map(x => [x.number, x.joins]));
+  assert.match(w['1472'], /45° elbow.*↔.*45° elbow/);
+  assert.match(w['1471'], /45° elbow.*↔.*lateral wye/);
+  assert.match(w['1473'], /Pipe P1 ↔ 6" 45° elbow/);
+  // The wye centre sits where the branch meets the run: 23'-3 5/16" from the -12 end.
+  const W = r.points.find(p => p.id === 'W')!.pos!;
+  assert.ok(Math.abs(W.x / 12 - 740.637) < 0.02, String(W.x / 12)); // within 1/4" of the branch-end geometry
+});
+t('sheet -11 (4"): 90, 45 and a 6x4 reducer add up to the BOM (24\'-2")', () => {
+  const r = solve(SHEET_11);
+  assert.ok(r.ready, JSON.stringify(r.checks));
+  assert.deepEqual(r.pieces.map(p => formatLength(p.cut)), [`5'-6 1/2"`, `18'-7 1/2"`, '—']);
+  assert.deepEqual(r.pieces.map(p => formatLength(p.takeout)), [`6 3/8"`, `1'-0 5/8"`, `1'-3 1/2"`]);
+  assert.ok(r.checks.some(c => c.level === 'ok' && /matches the BOM \(24'-2"\)/.test(c.text)));
+  assert.equal(r.fittings.find(f => f.fitting.type === 'reducer')!.name, '6" x 4" Reducer (item 2)');
+  assert.equal(r.size, 4);
 });
 t('sheet -2: geometry from elevations and the wye branch', () => {
   const r = solve(SHEET_2);
   const e2 = r.points.find(p => p.id === 'E2')!.pos!;
   assert.ok(Math.abs(e2.x / 12 - 1039.45) < 0.01);
   assert.equal(formatLength(r.pieces[1].cc), `1'-5"`);
-  assert.ok(r.checks.some(c => /Cleanout/.test(c.text)));
+  assert.ok(r.ready, JSON.stringify(r.checks)); // the cleanout now comes from the sheet-derived table
+  assert.ok(r.checks.some(c => c.level === 'ok' && /matches the BOM/.test(c.text)));
   assert.equal(r.welds.length, 7);
   assert.equal(r.fittings.find(f => f.id === 'F1')!.pos !== null, true);
 });

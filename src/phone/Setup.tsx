@@ -98,21 +98,25 @@ export function LibraryCard() {
   const [to, setTo] = useState<number | null>(null);
   const [br, setBr] = useState<number | null>(null);
   const [lay, setLay] = useState<number | null>(null);
+  const [out, setOut] = useState<number | null>(null);
+  const [small, setSmall] = useState('4');
   const [k, setK] = useState(0);
   const add = () => {
     const sz = parseSize(size);
-    if (sz === null || (to === null && br === null && lay === null)) return;
-    const entry: TakeoutEntry = {id: `${type}-${sz}-${mat}`, type, size: sz, material: mat, takeout: to, branch: br, laying: lay};
-    setPrefs({library: [entry, ...getPrefs().library.filter(e => !(e.type === type && e.size === sz && e.material === mat))]});
+    const sz2 = type === 'reducer' ? parseSize(small) : null;
+    if (sz === null || (to === null && br === null && lay === null && out === null)) return;
+    const entry: TakeoutEntry = {id: `${type}-${sz}${sz2 ? `x${sz2}` : ''}-${mat}`, type, size: sz, size2: sz2, material: mat, takeout: to, branch: br, outlet: out, laying: lay};
+    setPrefs({library: [entry, ...getPrefs().library.filter(e => !(e.type === type && e.size === sz && e.material === mat && (e.size2 ?? null) === (sz2 ?? null)))]});
     setTo(null);
     setBr(null);
     setLay(null);
+    setOut(null);
     setK(x => x + 1);
   };
   return (
     <div className="card">
       <h3>Fitting sizes (centre to end)</h3>
-      <p className="muted small">How far each fitting reaches from its centre (where the centrelines cross) to the face the pipe fuses to. The app adds up the fittings at both ends of a pipe to get that pipe's take-out, and subtracts it from the centre-to-centre length. Used when the drawing doesn't print one. Without an entry here, HDPE 90s, 45s and tees use the GF Central Plastics molded DR11 catalog (6": 90 = 8 5/8", 45 = 8 1/2", tee = 9"), and steel uses ASME B16.9 long-radius.</p>
+      <p className="muted small">How far each fitting reaches from its centre (where the centrelines cross) to the face the pipe fuses to. The app adds up the fittings at both ends of a pipe to get that pipe's take-out, and subtracts it from the centre-to-centre length. Used when the drawing doesn't print one. Without an entry here, HDPE 90s, 45s and tees use the GF Central Plastics molded DR11 catalog (6": 90 = 8 5/8", 45 = 8 1/2", tee = 9"; 4": 90 = 6 3/8", 45 = 6 1/4"); the 6" lateral wye (heel 2'-2 11/16", outlet 0", branch 2'-3 3/8"), the 6" cleanout (15 1/8") and the 6" x 4" reducer (9 1/4") come from your B&V sheets; steel uses ASME B16.9 long-radius.</p>
       {p.library.length ? (
         <table className="results lib">
           <tbody>
@@ -120,13 +124,14 @@ export function LibraryCard() {
               <tr key={e.id}>
                 <td>
                   <b>
-                    {e.size}" {FITTING_NAME[e.type]}
+                    {e.size}"{e.size2 ? ` x ${e.size2}"` : ''} {FITTING_NAME[e.type]}
                   </b>
                   <small>{e.material === 'hdpe' ? 'HDPE' : 'Steel'}</small>
                 </td>
                 <td>
                   {e.takeout !== null && <span>{formatLength(e.takeout)} </span>}
                   {e.branch != null && <span>branch {formatLength(e.branch)} </span>}
+                  {e.outlet != null && <span>outlet {formatLength(e.outlet)} </span>}
                   {e.laying != null && <span>body {formatLength(e.laying)}</span>}
                 </td>
                 <td>
@@ -184,10 +189,24 @@ export function LibraryCard() {
             <option value="steel">Steel</option>
           </select>
         </label>
-        <label>
-          Centre to end
-          <LenInput value={to} onChange={setTo} placeholder={`e.g. 8 5/8"`} allowEmpty />
-        </label>
+        {type === 'reducer' && (
+          <label>
+            Small end size
+            <input value={small} onChange={e => setSmall(e.target.value)} inputMode="decimal" />
+          </label>
+        )}
+        {/^elbow|tee|lateral/.test(type) && (
+          <label>
+            {type === 'lateral' ? 'Heel centre to end' : 'Centre to end'}
+            <LenInput value={to} onChange={setTo} placeholder={`e.g. 8 5/8"`} allowEmpty />
+          </label>
+        )}
+        {type === 'lateral' && (
+          <label>
+            Outlet centre to end
+            <LenInput value={out} onChange={setOut} placeholder={`e.g. 0"`} allowEmpty />
+          </label>
+        )}
         {(type === 'tee' || type === 'lateral') && (
           <label>
             Branch centre to end

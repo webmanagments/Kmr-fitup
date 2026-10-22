@@ -1,6 +1,7 @@
 // Reads an isometric photo with Claude (vision), straight from the phone with the user's own key.
 // The model fills in a fixed structure (a forced tool call), copying numbers exactly as printed.
 // The app does every calculation itself; the model only reads.
+import {SHEET_13} from './samples.ts';
 import type {Fitting, Joining, Leg, Point, Sheet, Weld, BomItem, FittingType} from './types.ts';
 
 export const MODELS = [
@@ -129,18 +130,47 @@ export const SHEET_TOOL = {
   },
 } as const;
 
-export const SYSTEM = `You read single-line piping isometric drawings (pipefitting / weld maps) for a fitter in the field.
+const EXAMPLE_READING = JSON.stringify(SHEET_13);
+
+export const SYSTEM = `You read single-line piping isometric drawings (pipefitting / fusion weld maps) for a fitter in the field.
 Your output feeds a calculator that works out cut lengths, so exact reading matters more than anything else.
 
-Rules:
-- Copy every dimension, coordinate and elevation EXACTLY as printed. Never round, convert or guess. If a digit or fraction is unclear, put null and describe it in "unreadable".
-- Coordinates (E, N, EL+) are in decimal feet. Dimensions are feet-inches (22'-11 1/4").
-- Model the pipe as points joined by straight legs. A point is a fitting centre (where centrelines meet) or an end of the pipe on this sheet. Make a leg for every straight run, including short ones between two fittings.
-- Directions come from the coordinates when printed, otherwise from the north arrow on the drawing. Vertical runs are Up or Down.
-- Put a printed dimension on a leg as "cc" only if it spans exactly that leg. A dimension that spans a fitting body (for example a lateral wye's centre-to-end) belongs in that fitting's takeout / branchTakeout / takeouts. A dimension that spans several legs: mention it in drawing.notes.
-- Weld numbers are usually handwritten in circles with a leader line pointing at the joint; match each to the point and, at a fitting, the leg whose pipe end it is on.
-- Copy the bill of materials row by row. The pipe quantity is a length.
-- Set joining to butt_fusion for HDPE / polyethylene.
+READ EXACTLY
+- Copy every dimension, coordinate and elevation EXACTLY as printed. Never round, convert, add up or guess. If a digit or fraction is unclear, put null and say what in "unreadable".
+- Coordinates (E 3117.36 / N 3219.80 / EL+ 3351.88) are decimal feet. Dimensions are feet-inches (23'-3 5/16", 11 15/16"). Elevation callouts are to the pipe centreline.
+- Dimension text is often printed rotated along the dimension line; read it in that direction.
+
+MODEL THE PIPE AS POINTS AND LEGS
+- A point is a fitting centre (where the centrelines meet) or an end of the pipe on this sheet. Make a leg for every straight centreline run between two points, including very short ones between two fittings that fuse straight together.
+- End points: a "Cont on: <drawing number>" box with coordinates (cont = that full drawing number; label "Cont. on -12"); a floor drain / hub ("BU-1304 TYPE: A": label it, no fitting there, the pipe runs to the printed point); a cleanout top ("CO-1301 TYPE: CO1" with coordinates: an end point, and the cleanout is a fitting of type cleanout sitting in-line at that end: inlineLeg = the riser leg, inlineAt = the end it is at).
+- A boxed group "3 / EL+ 3353.03 / 45°" tags the fitting at that point: BOM item 3, centre elevation 3353.03, a 45° fitting. "2 / EL+ 3352.01" is item 2 (look the item up in the BOM to know the fitting type).
+- Lateral wye: its point is where the branch centreline meets the run. Make one leg to each run side and one leg up the branch; set branchLeg.
+- Concentric reducer at a sheet break or between pipes: in-line fitting on that leg (inlineLeg/inlineAt), size "6\" x 4\"" (big end first).
+- Directions: give each leg's direction of travel from→to in plant axes: N, S, E, W, NE, Up, Down, a bearing like "S45W"/"N45E", or a rolled leg like "W 45 Down". Use printed coordinates first, then direction labels on the drawing ("N 45 E 0.29 Up" means that leg runs N45E, rising 0.29 ft), then the north arrow (usually top-left). Vertical risers and drops are Up / Down.
+
+WHICH DIMENSION GOES WHERE
+- "cc" is a printed dimension spanning exactly that leg, point to point. Several parallel dimension lines are common: the one nearest the pipe usually spans the shortest stretch (e.g. "23'-3 5/16"" wye to end), the outer one spans more (e.g. "26'-2 1/2"" 45 to end, which is 23'-3 5/16" + 2'-11 3/16"). Give each leg the one that spans exactly it; put overall dimensions in drawing.notes.
+- A rolled or sloped leg can show its parts: a vertical part ("1'-0 1/16"), a horizontal part ("11 15/16"") and the true length along the pipe ("1'-5""). The true length is the cc; the parts go in notes. Two equal parts (two "10 15/16"") belong to a 45° leg whose true length is printed separately ("1'-3 1/2"").
+- A riser's vertical dimension (e.g. "3'-11 5/8"" from a cleanout top down to the 45, or "6'-0 7/8"" from a floor drain down to the 90) is the cc of that riser leg.
+- A dimension along a lateral's branch from the wye point to the branch end ("2'-3 3/8"") is the cc of the branch leg.
+- Only use takeout / branchTakeout / takeouts / laying when the sheet explicitly dimensions a fitting body (centre to end, end to end). Never invent them.
+
+WELDS
+- Joint numbers are usually handwritten in red circles with a leader line to an X on the pipe. Boxes "13WWD-FW" mark field welds (type "FW"). Follow each leader to its X.
+- Record each joint at the point it is next to, and set "leg" to the leg it sits on (at a fitting with several legs). Where two fittings fuse straight together the X is between them on that short leg: use that leg.
+- A joint at a "Cont on" end belongs to that end point.
+
+BILL OF MATERIALS
+- Copy every row: item, size 1, size 2, description, qty exactly. The pipe quantity is a total length (25'-3 5/16"). Pipe size can differ from fitting sizes (4" pipe with a 6" x 4" reducer): give each fitting its own size.
+- material: e.g. "6\" IPS SDR 11 HDPE PE4710". joining: butt_fusion for HDPE / polyethylene.
+
+PHOTOS
+- Several photos may show one sheet in parts (title block, BOM, the drawing area, close-ups of a fitting cluster). Combine them into one reading; things that appear in two photos are the same thing, never count them twice.
+- drawing.number is the DRAWING NUMBER in the title block (e.g. ending -13). Also fill line (LINE NO.), pipeClass (PIPE CLASS), installSpec (INSTALL SPEC), rev, project and title when visible.
+
+EXAMPLE of a correct reading of a similar sheet (cleanout riser, two 45s rolled down onto a 6" lateral wye, a long sloped run, a branch to the next sheet). Coordinates in this example are shifted, so never copy its values:
+${EXAMPLE_READING}
+
 Always answer by calling the record_isometric tool exactly once with everything you read. Do not answer in plain text.`;
 
 export interface ImageIn {
@@ -150,7 +180,7 @@ export interface ImageIn {
 
 export function buildRequest(images: ImageIn[], model = DEFAULT_MODEL, hint = '') {
   const content: unknown[] = images.map(im => ({type: 'image', source: {type: 'base64', media_type: im.mediaType, data: im.data}}));
-  const many = images.length > 1 ? `These ${images.length} photos are all of the same sheet (the first is the whole sheet, the rest are close-ups). ` : '';
+  const many = images.length > 1 ? `These ${images.length} photos are all of ONE sheet: some may show the whole sheet, others parts of it or close-ups. Combine them. ` : '';
   content.push({type: 'text', text: `${many}Read this isometric and record it.${hint ? `\nNotes from the fitter (follow them): ${hint}` : ''}`});
   return {
     model,
